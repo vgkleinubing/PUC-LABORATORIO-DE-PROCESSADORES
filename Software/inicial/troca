@@ -1,0 +1,9 @@
+for ARM in [a-z]* ; do
+if [ -d $ARM ] ; then
+cd $ARM
+for ARQ in *.c ; do
+sed -i {s/"\"..\/lpc23xx.h\""/"<arch\/nxp\/lpc23xx.h>"/} $ARQ
+done
+cd ..
+fi
+done

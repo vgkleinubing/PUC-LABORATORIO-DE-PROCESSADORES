@@ -1,0 +1,205 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.0 Transitional//EN">
+<html><head>
+   <meta http-equiv="Content-Type" content="text/html; charset=ISO-8859-1">
+   <title>Lab. Processadores: Programa&ccedil;&atilde;o do LPC2378 usando o gcc</title>
+   <link rel="stylesheet" href="lpc-gcc.css" type="text/css">
+</head>
+<body>
+<center>
+<table cellpadding=2 width="100%">
+<tr><td width=61 align=center><img src="../../fengpuc.png" alt="fenglogo" width=61 height=78></td>
+<td bgcolor="#BFCFDF">
+<center>
+<font face="Arial,Helvetica">
+Laborat&oacute;rio de Processadores
+<br>
+Programa&ccedil;&atilde;o do LPC2378 usando o arm-elf-gcc<br>
+&Iacute;ndice
+</font>
+</center></td>
+<td width=61 align=center><img src="../../puclogo.png" alt="puclogo" width=61 height=78></td></tr>
+</table>
+</center>
+<table width="100%" border=1>
+<tr><td class="nav"><a href="lpc-index.html">Anterior</a></td>
+    <td class="nav"><a href="../index.html">Indice</a></td>
+    <td class="nav"><a href="lpc-01.html">Pr&oacute;ximo</a></td></tr>
+</table>
+
+<h3>T&oacute;picos</h3>
+<ol><li><a href="lpc-01.html">Configura&ccedil;&atilde;o do ambiente</a>
+	<ol>
+	<li><a href="lpc-01.html#ambiente">Configurando o ambiente de programa&ccedil;&atilde;o</a></li>
+	<li><a href="lpc-01.html#instala_windows">Procedimentos de instala&ccedil;&atilde;o no Windows</a></li>
+	<li><a href="lpc-01.html#instala_linux">Procedimentos de instala&ccedil;&atilde;o no Linux</a></li>
+	<li><a href="lpc-01.html#projeto">Cria&ccedil;&atilde;o de um projeto aplicativo</a></li>
+	<li><a href="lpc-01.html#compila">Compila&ccedil;&atilde;o e Instala&ccedil;&atilde;o do projeto</a></li>
+	</ol>
+   </li>
+   <li><a href="lpc-02.html">An&aacute;lise dos programas: GPIO</a>
+	<ol>
+	<li><a href="lpc-02.html#makefile">Makefile</a></li>
+	<li><a href="lpc-02.html#crts">crt.s</a></li>
+	<li><a href="lpc-02.html#flash-ld">lpc2378_flash.ld</a></li>
+	<li><a href="lpc-02.html#mainc">main.c</a></li>
+	<li><a href="lpc-02.html#mainc">Mapa das portas GPIO dos LEDs, bot&otilde;es e LCD</a></li>
+	</ol>
+   </li>
+   <li><a href="lpc-03.html">Configura&ccedil;&atilde;o do da porta serial</a>
+	<ol>
+	<li><a href="lpc-03.html#make">Compila&ccedil;&atilde;o e uso do programa 2</a></li>
+	<li><a href="lpc-03.html#uart">Configura&ccedil;&atilde;o da porta serial</a></li>
+	</ol>
+   </li>
+   <li><a href="lpc-03.html">Timer, display LCD e Rel&oacute;gio RTC</a>
+	<ol>
+	<li><a href="lpc-04.html#timer">Timer</a></li>
+	<li><a href="lpc-04.html#lcd">Display LCD</a></li>
+	</ol>
+   <li><a href="lpc-05.html">Rel&oacute;gio RTC</a></li>
+   <li><a href="lpc-06.html">Configura&ccedil;&atilde;o do clock e do PLL</a></li>
+   <li><a href="lpc-07.html">Interrup&ccedil;&otilde;es</a>
+	<ol>
+	<li><a href="lpc-07.html#timer">Configura&ccedil;&atilde;o do timer para gerar interrup&ccedil;&otilde;es</a></li>
+	<li><a href="lpc-07.html#fiq">Interrup&ccedil;&atilde;o FIQ</a></li>
+	<li><a href="lpc-07.html#irq">IRQ n&atilde;o vetorada e IRQ vetorada</a></li>
+	</ol>
+   </li>
+   <li><a href="lpc-08.html">Interface I<sup>2</sup>C</a>
+	<ol>
+	<li><a href="lpc-08.html#usoprog">Compila&ccedil;&atilde;o e uso do Programa</a></li>
+	<li><a href="lpc-08.html#i2c">Descri&ccedil;&atilde;o Gen&eacute;rica da Interface I<sup>2</sup>C</a></li>
+	<li><a href="lpc-08.html#i2c_lpc2378">A interface I<sup>2</sup>C no LPC2378</a></li>
+	</ol>
+   </li>
+   <li><a href="lpc-09.html">Prorama&ccedil;&atilde;o da mem&oacute;ria Flash (IAP)</a></li>
+   <li><a href="#bibliografia">Bibliografia</a></li>
+</ol>
+<h3>Programas</h3>
+<ul><li>
+  <a href="a02_pisca_led/">a02_pisca_led</a> Primeiro projeto: Pisca LEDS.
+	<ul>
+	<li><a href="a02_pisca_led/Makefile">Makefile</a> do primeiro projeto</li>
+	<li><a href="a02_pisca_led/crt.S">crt.S</a> Rotina de startup</li>
+	<li><a href="a02_pisca_led/lpc2378_flash.ld">lpc2378_flash.ld</a> Configura&ccedil;&atilde;o do Linker</li>
+	<li><a href="a02_pisca_led/main.c">main.c</a> Programa principal do primeiro projeto</li>
+	</ul><br></li>
+<li>
+  <a href="a03_uart/">a03_uart/</a> Segundo projeto: Configura a UART e escreve uma mensagem.
+	<ul>
+	<li><a href="a03_uart/Makefile">Makefile</a> do segundo projeto</li>
+	<li><a href="a03_uart/crt.S">crt.S</a> Rotina de startup</li>
+	<li><a href="a03_uart/lpc2378_flash.ld">lpc2378_flash.ld</a> Configura&ccedil;&atilde;o do Linker</li>
+	<li><a href="a03_uart/main.c">main.c</a> Programa principal do segundo projeto</li>
+	</ul><br></li>
+<li>
+  <a href="a04_timer_lcd/">a04_timer_lcd/</a> Terceiro projeto: Configura Timer e Display LCD.
+	<ul>
+	<li><a href="a04_timer_lcd/Makefile">Makefile</a></li>
+	<li><a href="a04_timer_lcd/crt.S">crt.S</a> Rotina de startup</li>
+	<li><a href="a04_timer_lcd/lpc2378_flash.ld">lpc2378_flash.ld</a> Configura&ccedil;&atilde;o do Linker</li>
+	<li><a href="a04_timer_lcd/main.c">main.c</a> Programa principal do terceiro projeto</li>
+	</ul><br></li>
+<li>
+  <a href="a05_relogio/">a05_relogio/</a> Quinto projeto: Rel&oacute;gio RTC.
+	<ul>
+	<li><a href="a05_relogio/Makefile">Makefile</a></li>
+	<li><a href="a05_relogio/crt.S">crt.S</a> Rotina de startup</li>
+	<li><a href="a05_relogio/lpc2378_flash.ld">lpc2378_flash.ld</a> Configura&ccedil;&atilde;o do Linker</li>
+	<li><a href="a05_relogio/main.c">main.c</a> Programa principal do quarto projeto</li>
+	<li><a href="a05_relogio/lcd.c">lcd.c</a> M&oacute;dulo com rotinas para acessar o display LCD</li>
+	<li><a href="a05_relogio/lcd.h">lcd.h</a> Cabe&ccedil;alho do m&oacute;dulo LCD</li>
+	</ul><br></li>
+<li> <a href="a06_pll/">a06_pll/</a> Sexto projeto: Configura&ccedil;&atilde;o do Clock e do PLL.
+	<ul>
+	<li><a href="a06_pll/main.c">main.c</a> Programa principal com um di&aacute;logo atrav&eacute;s
+da porta serial</li>
+	<li><a href="a06_pll/pll.c">pll.c</a> Configura&ccedil;&atilde;o do Clock e do PLL</li>
+	<li><a href="a06_pll/uart.c">uart.c</a> Configura&ccedil;&atilde;o da porta serial UART</li>
+	</ul><br></li>
+
+<li><a href="a07_T0_FIQ">a07_T0_FIQ</a>Timer com interrup&ccedil;&atilde;o vetorada tipo FIQ.
+Usa a interrump&ccedil;&atilde;o do timer T0 para piscar LEDs
+<ul>
+	<li><a href="a07_T0_FIQ/main.c">main.c</a> Programa principal</li>
+	<li><a href="a07_T0_FIQ/vic_cpsr.h">vic_cpsr.h</a> Cabe&ccedil;alho com macros para habilitar 
+interrup&ccedil;&otilde;es no microcontrolador.</li>
+	</ul><br>
+</li>
+<li><a href="a07_RTC_IRQ">a07_RTC_IRQ</a>
+Usa uma interrup&ccedil;&atilde;o do rel&oacute;gio RTC em modo IRQ e para acionar o display LCD.
+No acionamento do display implemeta-se uma fila tipo FIFO. As escritas destinadas ao display 
+v&atilde;o para uma fila na mem&oacute;ria. A rotina de interrup&ccedil;&atilde;o retira 
+desta fila um caractere por vez e escreve no LCD.
+</li>
+<li><a href="a08_tmp101/">a08_tmp101/</a> Demonstra o uso da interface I<sup>2</sup>C sem interrup&ccedil;&atilde;o.
+Acessa um term&ocirc;metro tipo TMP101 conectado &agrave; interface I<sup>2</sup>C numero 2, 
+implementando um rel&oacute;gio com term&ocirc;metro.<br></li>
+<li><a href="a08_tmp_irq/">a08_tmp_irq/</a> Similar ao a08_tmp101: (Rel&oacute;gio com term&ocirc;metro TMP100)
+ por&eacute;m usando a interrup&ccedil;&atilde;o da interface I<sup>2</sup>C.<br></li>
+<li><a href="a08_smcard/">a08_smcard/</a> Le e escreve em cart&otilde;es tipo SmartCard, usando a interface I<sup>2</sup>C.</li>
+<li><a href="pwm/">pwm/</a> Programa que demonstra a configura&ccedil;&atilde;o do
+modulador por largura de pulso (PWM).</li>
+<li><a href="mon23/">mon23/</a> Programa que monitor
+que mostra/edita a mem&oacute;ria, carrega e executa prohramas *.hex na RAM, e programa a mem&oacute;ria FLASH
+isando fun&ccedil;&otilde;es IAP.</li>
+<li><a href="mprintf/">mprintf/</a> Programa que demonstra o uso de aritm&eacute;tica em ponto flutuante
+tipo double. Incui uma implementa&ccedil;&atilde;o pr&oacute;pria da fun&ccedil;&atilde;o sprintf e sqrt.
+<br></li>
+</ul>
+<a name="bibliografia"></a>
+<h3>Bibliografia</h3>
+Todos os &iacute;tens abaixo est&atilde;o integralmente dispon&iacute;veis na internet:
+<ul>
+<li><a href="http://www.standardics.nxp.com/support/documents/microcontrollers/pdf/user.manual.lpc23xx.pdf">
+user.manual.lpc23xx.pdf [12MBytes]</a> Este &eacute; o manual completo oficial da NXP sobre
+a fam&iacute;lia LPC2368/LPC2378, incluindo a descri&ccedil;&atilde;o dos
+perif&eacute;ricos e registradores especiais</li>
+<li><a href="http://www.hitex.co.uk/arm/lpc2000book/index.html">
+Trevor Martin: The Insider's Guide To The LPC21xx</a> Livro completo sobre a fam&iacute;lia ARM
+da NXP.</li>
+<li><a href="http://openhardware.net/Embedded_ARM/Toolchain">
+http://openhardware.net/Embedded_ARM/Toolchain</a>
+Aqui explica como compilar o seu pr&oacute;prio sistema de desenvolvimento
+para ARM baseado nas vers&otilde;es mais recentes das ferramentas GNU-GCC.</li>
+<li><a href="http://www.mikrocontroller.net/articles/LPC2000">
+http://www.mikrocontroller.net/articles/LPC2000</a> P&aacute;gina em Alem&atilde;o com muitas informa&ccedil;&otilde;es
+links artigos e programas para download relacionados com os processadores ARM da NXP.</li>
+<li><a href="http://www.mikrocontroller.net/en/arm-gcc">
+http://www.mikrocontroller.net/en/arm-gcc</a> Aqui est&aacute; dispon&iacute;vel para download o
+conjunto de ferramentas gnu-arm-gcc compilado para Linux e para McIntosh.</li>
+<li><a href="http://www.siwawi.arubi.uni-kl.de/avr_projects/arm_projects/">
+Martin Thomas: ARM Projects</a> P&aacute;gina com programas exemplo, links e informa&ccedil;&otilde;es
+sobre processadores LPC21xx. Aqui pode-se obter a vers&atilde;o compilada
+para Windows do 
+<a href="http://www.siwawi.arubi.uni-kl.de/avr_projects/arm_projects/WinARM-20060606.exe">arm-gcc</a>.</li>
+<li><a href="http://www.nxp.com/pip/LPC2378_3.html">http://www.nxp.com/pip/LPC2378_3.html</a>
+P&aacute;gina de apresenta&ccedil;&atilde;o do LPC2378 na NXP.</li>
+<li><a href="http://www.eclipse.org/cdt/">
+http://www.eclipse.org/cdt/</a> Este &eacute; um ambiente integrado
+(IDE) para ARM escrito em Java usando as ferramentas GNU. Pode funcionar em Windows ou em Linux.
+</li>
+<li><a href="http://www.ee.pucrs.br/~stemmer/labproc/eclipse_ARM.pdf">eclipse_ARM.pdf [3,5M copia local]</a> Apostila que descreve como instalar e usar
+o ambiente integrado <i>eclipse</i> junto com os compiladores GNU para ARM. 
+Escrita por Gustavo Schwartz, a partir de pesquisas na internet. Usou o livro <i>ARM Cross Development with Eclipse</i> de James P. Lynch como principal fonte de informa&ccedil;&otilde;es.
+Pode-se entrar em contato com o autor em gs.br[arrouba]hotmail.com.
+</li>
+<li><a href="http://tech.groups.yahoo.com/group/lpc21isp/">
+http://tech.groups.yahoo.com/group/lpc21isp/</a> Grupo de disciss&atilde;o no yahoo sobre
+o lpc21isp</li>
+<li><a href="http://tech.groups.yahoo.com/group/lpc2000/"> 
+http://tech.groups.yahoo.com/group/lpc2000/ </a> Grupo de disciss&atilde;o no yahoo sobre
+os processadores da fam&iacute;lia LPC2000</li>
+<li><a href="http://embeddedrelated.com/groups/lpc2000/1.php">http://embeddedrelated.com/groups/lpc2000/1.php</a>
+Forum de discuss&atilde;o sobre microcontroladores da fam&iacute;lia LPC2000. Muitas informa&ccedil;&otilde;es &uacute;teis.
+</li>
+</ul>
+<hr>
+<table width="100%" border=1>
+<tr><td class="nav"><a href="lpc-index.html">Anterior</a></td>
+    <td class="nav"><a href="../index.html">Indice</a></td>
+    <td class="nav"><a href="lpc-01.html">Pr&oacute;ximo</a></td></tr>
+</table>
+<font size="-1">Atualizado em 17/8/2009 por Marcos Augusto Stemmer</font>
+</body>
+</html>

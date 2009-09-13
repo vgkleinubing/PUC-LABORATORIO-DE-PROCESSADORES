@@ -1,0 +1,319 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.0 Transitional//EN">
+<html><head>
+   <meta http-equiv="Content-Type" content="text/html; charset=ISO-8859-1">
+   <title>Lab. Processadores: Programa&ccedil;&atilde;o do LPC2378 usando o gcc</title>
+   <link rel="stylesheet" href="lpc-gcc.css" type="text/css">
+</head>
+<body>
+<center>
+<table cellpadding=2 width="100%">
+<tr><td width=61 align=center>
+<img src="../../fengpuc.png" alt="fenglogo" width=61 height=78></td>
+<td bgcolor="#BFCFDF">
+<center>
+<font face="Arial,Helvetica">
+Laborat&oacute;rio de Processadores
+<br>
+Programa&ccedil;&atilde;o do LPC2378 usando o arm-elf-gcc<br>
+Parte 1: Configura&ccedil;&atilde;o do ambiente
+</font>
+</center></td>
+<td width=61 align=center>
+<img src="../../puclogo.png" alt="puclogo" width=61 height=78></td></tr>
+</table>
+</center>
+<table width="100%" border=1>
+<tr><td class="nav"><a href="lpc-index.html">Anterior</a></td>
+    <td class="nav"><a href="lpc-index.html">Indice</a></td>
+    <td class="nav"><a href="lpc-02.html">Pr&oacute;ximo</a></td></tr>
+</table>
+
+<p>
+<ul>
+<li><a href="#ambiente">Configurando o ambiente de programa&ccedil;&atilde;o</a></li>
+<li><a href="#instala_windows">Procedimentos de instala&ccedil;&atilde;o no Windows</a></li>
+<li><a href="#instala_linux">Procedimentos de instala&ccedil;&atilde;o no Linux</a></li>
+<li><a href="#projeto">Cria&ccedil;&atilde;o de um projeto aplicativo</a></li>
+<li><a href="#compila">Compila&ccedil;&atilde;o e Instala&ccedil;&atilde;o do projeto</a></li>
+</ul>
+<p>
+<h3>Introdu&ccedil;&atilde;o</h3>
+<p>Neste semestre vamos usar um novo tipo de microprocessador, radicalmente diferente
+da arquitetura 8051 vista em semestres anteriores. 
+Trata-se do LPC2378 da NXP com core tipo ARM7-TDMI. 
+A arquitetura ARM (Advanced Risc Machine) &eacute; um processador RISC de 32 bits
+com um pipeline de 3 est&aacute;gios, que permite executar uma instru&ccedil;&atilde;o de 32 bits
+a cada ciclo de clock.
+<p>A sigla TDMI (Thumb Debugger Multiplier Instruction set) representa um conjunto
+de intru&ccedil;&otilde;es alternativo (Thumb mode) de 16 bits. Processadores tipo ARM7-TDMI
+podem executar estes dois conjuntos de instru&ccedil;&otilde;es: ARM ou Thumb. No modo ARM
+todas as instru&ccedil;&otilde;es s&atilde;o tem 4 bytes. No conjunto de instru&ccedil;&otilde;es Thumb
+a maioria das instru&ccedil;&otilde;es &eacute; de 2 bytes.
+<p>O LPC2378 tab&eacute;m tem v&aacute;rias interfaces incorporadas:
+<ul>	<li>512K Bytes de Mem&oacute;ria Flash program&aacute;vel no sistema atrav&eacute;s da porta serial.</li>
+	<li>32K Bytes de RAM</li>
+	<li>Quatro UARTs (Portas seriais) compat&iacute;veis com o 16550, uma
+	delas com sinais de controle de fluxo e uma com IrDA.</li>
+	<li>Interface de rede ETHERNET MAC com DMA.</li>
+	<li>Interface USB2.0</li>
+	<li>Interfaces SPI e I<sup>2</sup>C.</li>
+	<li>Duas interfaces CAN</li>
+	<li>Conversores A-D e D-A de 10 bits.</li>
+	<li>PWM</li>
+	<li>Quatro temporizadores (Timers).
+	<li>Rel&oacute;gio de tempo real RTC</li>
+	<li>Muito mais coisas: ver manual</li>
+	
+</ul>
+
+<a name="ambiente"></a>
+<h3>Configurando o ambiente de programa&ccedil;&atilde;o</h3>
+<p>Existem v&aacute;rios compiladores e ambientes de desenvolvimento de software
+para este tipo de microprocessadors. Dentre eles podemos destacas tres sistemas.
+Dois ambientes integrados para Windows, incluido editor de texto compilador C, 
+assembler, simulador e debugger: o da IAR e o da Keil. Estes s&atilde;o sistemas
+comerciais, com prossiblidades de se obter amostras gr&aacute;tis limitadas.
+Existe tamb&eacute;m a op&ccedil;&atilde;o baseada em software livre, com o conjunto de ferramentas 
+GNU-Gcc para a arquitetura ARM.
+<ul>
+	<li><a href="http://www.iar.com/website1/1.0.1.0/68/1/index.php">IAR</a>
+	A IAR oferece pacotes completos de desenvolvimento na ambiente Windows
+	incluindo compilador c/c++, assembler, simulador e debugger.</li>
+	<li><a href="http://www.keil.com">Keil</a>
+	O Keil &eacute; outro ambiente completo de desenvolvimento de software para
+	ARM com bom suporte aos processadores da NXP. Tambem &eacute; software propriet&aacute;rio,
+	s&oacute; para Windows.</li>
+	<li><a href="http://www.rowley.co.uk/arm/">CrossWorks</a> &eacute; um ambiente de desenvolvimento 
+	baseado no GCC que pode funcionar em Windows ou em Linux. 
+	&Eacute; um programa comercial, disponibilizando amostras limitadas v&aacute;lidas por 30 dias.</li>
+	<li><a href="http://www.mikrocontroller.net/articles/ARM_GCC_toolchain_for_Linux_and_Mac_OS_X">
+arm-elf-gcc</a> O gcc &eacute; um conjunto de compiladores distribu&iacute;do como software livre,
+podendo funcionar em v&aacute;rios sistemas operacionais.</li>
+</ul>
+
+Eu vou descrever aqui a configura&ccedil;&atilde;o do gcc. Este sistema tem duas vantagens
+muito importantes para o nosso ambiente acad&ecirc;mico:
+<ul><li>&Eacute; software livre (Licen&ccedil;a GNU-GPL ou LGPL). Isto significa que pode-se
+copiar, instalar, usar ou modificar estes programas sem infringir nenhuma lei.</li>
+<li>O arm-elf-gcc &eacute; multiplataforma, podendo ser configurado para funcionar em diversos
+sistemas operacionais, incluindo o Linux, Windows e McInitosh.</li>
+</ul>
+<h3>Ferramentas necess&aacute;rias para programar para ARM usando o gcc</h3>
+<p>O pacote arm-elf-gcc pode ser obtido em
+<p><a href="http://www.mikrocontroller.net/articles/ARM_GCC_toolchain_for_Linux_and_Mac_OS_X">
+http://www.mikrocontroller.net/articles/ARM_GCC_toolchain_for_Linux_and_Mac_OS_X</a>
+<p>Este pacote tem as ferramentas b&aacute;sicas para compilar e depurar programas para ARM, 
+incluindo os seguintes programas:<p>
+<b>arm-elf-gcc</b> Compilador C<br>
+<b>arm-elf-g++</b> Compilador C++<br>
+<b>arm-elf-as</b> Assembler.<br>
+<b>arm-elf-ld</b> Linker/loader<br>
+<b>arm-elf-objcopy</b> Copia convertendo formatos de c&oacute;digo objeto<br>
+<p>O pacote tambem inclui os arquivos <tt>#include</tt> e as bibliotecas b&aacute;sicas da
+linguagem C.
+<p>Para o desenvolvimento e teste dos programas para ARM algumas ferramentas adicionais
+tamb&eacute;m s&atilde;o necess&aacute;rias:
+<ul><li>Um editor de texto adequado para escrever programas em linguagem C.</li>
+	<li>O programa <a href="lpc21isp.c">lpc21isp.c</a> para carregar programas
+	na mem&oacute;ria Flash do microprocessador. Esta c&oacute;pia local foi modificada em rela&ccedil;&atilde;o
+	a outras vers&otilde;es do <i>lpc21isp.c</i> que se encontram na Internet.
+	A modifica&ccedil;&atilde;o serve para incluir o suporte ao LPC2378.</li>
+	<li>O programa <i>gnu make</i> para automatizar as etapas da compila&ccedil;&atilde;o dos 
+	programas. Na maioria das distribui&ccedil;&otilde;es de Linux o <i>make</i> ja vem inclu&iacute;do. 
+	No Windows o make vem como parte do pacote 
+	<a href="http://souceforge.net/mingw">mingw</a> ou junto com o
+	<a href="http://www.bloodshed.net/dev/devcpp.html">devcpp</a>.</li>
+</ul>
+O procedimento de instala&ccedil;&atilde;o das ferramentas difere um pouco dependendo do sistema
+operacional.
+<br>&nbsp;<br>
+<a name="instala_windows"></a>
+<b>Instala&ccedil;&atilde;o do arm-gcc para Windows</b>
+<p>Uma vers&atilde;o compilada para windows encontra-se em<br>
+<a href="http://www.siwawi.arubi.uni-kl.de/avr_projects/arm_projects/index.html#winarm">
+http://www.siwawi.arubi.uni-kl.de/avr_projects/arm_projects/index.html#winarm</a><br>
+Neste site existem programas exemplo e explica&ccedil;&otilde;es sobre o pacote WinARM.
+O link
+<p>Para poder compilar os programas deste tutorial, eu fiz algumas modifica&ccedil;&otilde;es no
+pacote WinARM: Substitui o programador de Flash <p>
+<b>[Novidade! 17/05/2009]</b> recentemente os LPC2378 come&ccedil;aram a se apresentar com um outro
+n&uacute;mero de identifica&ccedil;&atilde;o. 
+Isto  signifca lpc21isp.exe precisa ser usbstituído por uma nova vers&atilde;o 1.32:
+<a href="lpc21isp.exe">lpc21isp.exe</a>.
+<p>Tamb&eacute;m foi acrescentado no WinARM o arquivo de cabe&ccedil;alho
+<tt class="code">#include &lt;arch/nxp/lpc23xx.h></tt> e o terminal serial <tt class="code">wtser.exe</tt>. 
+O pacote completo est&aacute; no segunte arquivo
+auto-extra&iacute;vel com cerca de 45 MBytes:<p>
+<a href="../arm/WinARM.exe">WinARM.exe [45 MBytes]</a>
+<p>Para poder compilar os programas a partir de qualquer diret&oacute;rio de trabalho
+&eacute; necess&aacute;rio que o diret&oacute;rio <tt class="code">WinARM\bin</tt> esteja no caminho de busca por programas execut&aacute;veis (<tt class="code">path</tt>).
+Para alterar o <tt class="code">path</tt> no Windows usa-se o programa <tt class="code">regedit</tt>
+para editar a chave <tt class="code">HKEY_CURRENT_USER/Environment/PATH</tt>. 
+Geralmente &eacute; necess&aacute;rio reiniciar o Windows para que esta altera&ccedil;&atilde;o do registry fa&ccedil;a efeito. &Eacute; necess&aacute;rio ter poderes de administrador para poder editar o 
+registry. Quando n&atilde;o se tem este tipo de acesso, pode-se criar o path apenas para a sess&atilde;o 
+corrente da janela de comandos. Supondo que o WinARM tenha sido instalado em 
+<tt class="code">c:\WinARM</tt> pode-se configurar o caminho com o comando:
+<pre class="code">
+path=c:\WinARM\bin;%path%
+</pre>
+Este comando pode ser executado por um usu&aacute;rio comum, mas s&oacute; faz efeito na janela de
+comando onde foi executado. Para automatizar este processo pode-se criar um arquivo
+batch com esta linha.
+<p>Outro m&eacute;todo para configurar o caminho no Windows &eacute; usando o <i>"Painel de Controle"</i>:
+<ul>	<li>A partir do menu "Iniciar" chame o programa <i>"Painel de Controle"</i></li>
+	<li>No painel de controle ative o &iacute;cone <i>"Sistema"</i> ou <i>"System"</i></li>
+	<li>No programa <i>"Sistema"</i> selecione o tab <i>"Avan&ccedil;ado"</i> </li>
+	<li>Aperte no bot&atilde;o <i>"Vari&aacute;veis de ambiente"</i> 
+		(ou <i>"Environment Variables"</i> na vers&atilde;o em Ingl&ecirc;s)</li>
+	<li>Selecione a vari&aacute;vel de ambiente chamada <i>"Path"</i> e aperte no bot&atilde;o <i>"Editar"</i></li>
+	<li>Acrescente o caminho <tt class="code">C:\WinARM\bin</tt> ao valor da vari&aacute;vel Path
+	e aperte no bot&atilde;o <i>"OK"</i>.</li>
+</ul>
+	
+<p>Para verificar se o compilador foi instalado com sucesso, pode-se
+executar o comando:<p>
+<pre class="code">arm-elf-gcc -v
+</pre>
+O compilador deve escrever informa&ccedil;&otilde;es sobre a vers&atilde;o instalada.
+<br>&nbsp;<br>
+<a name="instala_linux"></a>
+<b>Instala&ccedil;&atilde;o do arm-gcc para Linux</b>
+<p>Uma vers&atilde;o pr&eacute; compilada do arm-gcc para Linux encontra-se em:
+<p><a href="http://www.mikrocontroller.net/articles/ARM_GCC_toolchain_for_Linux_and_Mac_OS_X">
+http://www.mikrocontroller.net/articles/ARM_GCC_toolchain_for_Linux_and_Mac_OS_X</a>
+<p>Devemos acrescentar os arquivos ltser, lpc21isp e lpx23xx.h para facilitar o uso deste pacote. 
+Empacotei estes arquivos em<p>
+<a href="http://www.ee.pucrs.br/~stemmer/arm/lpc21isp-2378.tar.gz">http://www.ee.pucrs.br/~stemmer/arm/lpc21isp-2378.tar.gz</a>
+<p>
+Basta baixar o arquivo, expandi-lo e acrescentar o subdiret&oacute;rio bin ao $PATH.
+Isto pode ser feito com o seguinte procedimento:
+<pre class="code">
+# Pega os arquivos
+wget  <a href="http://www.mikrocontroller.net/download/arm-toolchain-linux-2.tar.bz2">http://www.mikrocontroller.net/download/arm-toolchain-linux-2.tar.bz2</a>
+wget <a href="http://www.ee.pucrs.br/~stemmer/arm/lpc21isp-2378.tar.gz">http://www.ee.pucrs.br/~stemmer/arm/lpc21isp-2378.tar.gz</a>
+# Expande 
+tar xjf arm-toolchain-linux-2.tar.bz2
+# Aplica remendo que substitui o lpc21isp e acrescenta o ltser e o lpc23xx.h
+tar xzf lpc21isp-2378.tar.gz
+# Move para o diretorio de instalacao: por exemplo
+# /usr/local (Necessita permissao de escrita no <tt>/usr/local</tt>)
+mv arm /usr/local/
+# Edita o /etc/profile para acrescentar /usr/local/arm/bin ao $PATH
+echo 'export PATH=$PATH:/usr/local/arm/bin' &gt;&gt; /etc/profile
+</pre>
+Como o /etc/profile so &eacute; executedo no login, o usu&aacute;rio deve fazer logout e login
+para que o /usr/local/arm/bin seja acrescentado ao PATH.
+<a name="projeto"></a>
+<h3>Cria&ccedil;&atilde;o de um projeto aplicativo</h3>
+<p>Tendo um conjunto de ferramentas de desenvolvimento instalado e configurado,
+pode-se criar o diret&oacute;rio espec&iacute;fico para o nosso projeto.
+<p>Por ser um compilador poderoso, capaz de compilar grandes projetos de software,
+o processo de compila&ccedil;&atilde;o de um programa usando o gcc passa por diversas etapas.
+Geralmente o comando b&aacute;sico <tt>gcc</tt> ja faz tudo o que &eacute; necess&aacute;rio para gerar
+o programa execut&aacute;vel, mas quando se compila para outra arquitetura alvo, como
+o ARM, &eacute; necess&aacute;rio ter mais controle, ativando explicitamente as etapas da compila&ccedil;&atilde;o.
+<p>Os programas gerados pelo gcc usam um formato intermedi&aacute;rio chamado <tt>elf</tt> 
+(<i>Embeddable and Linkable Format</i>), que s&atilde;o os arquivos objeto com exten&ccedil;&atilde;o <tt>.o</tt>
+V&aacute;rios arquivos <tt>elf</tt> podem ser reunidos, incluindo o c&oacute;digo de partida <tt>crt.o</tt>
+e as bibliotecas para formar o programa execut&aacute;vel. No conjunto de ferramentas gnu,
+quem faz isto &eacute; o linker/loader chamado <tt>ld</tt>. No pacote para ARM temos o
+<tt>arm-elf-ld</tt>. Geralmente o <tt>ld</tt> &eacute; chamado automaticamente pelo <tt>gcc</tt>,
+mas como queremos usar uma rotina especial de partida, chamaremos o <tt>arm-elf-ld</tt>
+explicitamente. O resultado do comando <tt>arm-elf-ld</tt> &eacute; um programa
+que no Linux seria execut&aacute;vel, mas para program&aacute;-lo na Flash do LPC2378, devemos
+converter este arquivo para o formato <tt>*.hex</tt>. Isto &eacute; feito pelo
+programa <tt>arm-elf-objcopy</tt>. Finalmente o arquivo com exten&ccedil;&atilde;o <tt>*.hex</tt>
+pode ser usado para gravar a mem&oacute;ria Flash do LPC2378 usando o programa
+<tt>lpc21isp</tt>. 
+<p>Seria cansativo e propenso a erros ter que fazer todo este procedimento manualmente
+toda a vez que queremos compilar o projeto. &Eacute; poss&iacute;vel automatizar esta compila&ccedil;&atilde;o
+usando um script de shell ou no DOS, um arquivo de execu&ccedil;&atilde;o em lote tipo <tt>*.bat</tt>,
+por&eacute;m a melhor solu&ccedil;&atilde;o &eacute; usar o comando <tt>make</tt>.
+<p>O comando <tt>make</tt> usa um arquivo chamado <tt>Makefile</tt>, que
+descreve os procedimentos necess&aacute;rios para compilar o projeto.
+<p>O arquivo <a href="arm02.tgz">arm02.tgz</a> 
+cont&eacute;m a estrutura b&aacute;sica para o nosso primeiro projeto para o LPC2378 copilado com o
+arm-elf-gcc. Ao ser expandido (com <tt>tar xzf arm02.tgz</tt> no linux, ou com
+o Win-zip no Windows), ele cria um diret&oacute;rio chamado <tt>arm02</tt> contendo os seguintes
+arquivos:
+<dl>
+<dt><tt><b>Makefile</b></tt>
+<dd>Arquivo de configura&ccedil;&atilde;o do programa <tt><b>make</b></tt>, descrevendo os procedimentos
+necess&aacute;rios para automatizar a compila&ccedil;&atilde;o do projeto.</dd>
+<dt><tt><b>crt.S</b></tt>
+<dd>Procedimento de inicializa&ccedil;&atilde;o (<i>startup</i>) escrito em linguagem assembly do ARM7.
+Este procedimento contem o ponto de entrada principal do programa e as entradas das interrup&ccedil;&otilde;es.
+Ele faz algumas inicializa&ccedil;&otilde;es e chama a rotina <tt>main()</tt> da parte escrita em linguagem C.
+</dd>
+<dt><tt><b>lpc2378_flash.ld</b></tt>
+<dd>Script de configura&ccedil;&atilde;o de linker/loader. Este arquivo descreve como o 
+<tt>arm-elf-ld</tt> deve alocar mem&oacute;ria no LPC2378 para os segmentos do programa.
+</dd>
+<dt><tt><b>lpc23xx.h</b></tt>
+<dd>Arquivo de cabe&ccedil;alho para <tt>#include</tt> contendo a descri&ccedil;&atilde;o dos registradores, 
+e portas de I/O dos perif&eacute;ricos do LPC2378.
+</dd>
+<dt><tt><b>main.c</b></tt>
+<dd>Programa principal. Neste exemplo procurou se fazer a coisa mais simples poss&iacute;vel 
+que tenha resultados pr&aacute;ticos: Fazer piscar um LED.
+</dd>
+</dl>
+<a name="compila"></a>
+<h3>Compila&ccedil;&atilde;o e Instala&ccedil;&atilde;o do projeto</h3>
+<p>Para compilar e testar o programa use o seguinte procedimento:
+<ul><li>Pegar o arquivo <a href="mon23.tgz">mon23.tgz</a>
+</li>
+<li>Expandir: No Linux usa-se o comando
+<pre class="code">
+tar xzf mon23.tgz
+</pre></li>
+<li>Pegar um <tt>shell</tt> (Janela de comandos) e entrar no diret&oacute;rio <tt>mon23</tt>
+<pre class="code">cd mon23
+</pre></li>
+<li>Compilar o projeto com o comando 
+<pre class="code">
+make
+</pre>
+</li>
+<li>Preparar o Kit LPC2378 para grava&ccedil;&atilde;o: Conectar o cabo de comunica&ccedil;&atilde;o serial, ligar a placa
+e pressionar e soltar o bot&atilde;o <b>reset</b> enquanto o bot&atilde;o de programa&ccedil;&atilde;o &eacute; mantido pressionado.</li>
+<li>Executar o comando para programar a Flash:
+<pre class="code">
+make isp
+</pre>
+Este comando grava o programa na mem&oacute;ria do LPC2378 e executa o programa.
+O LED deve come&ccedil;ar a piscar. Pode ser necess&aacute;rio apertar
+no bot&atilde;o de <i>Reset</i> para que a execu&ccedil;&atilde;o do programa
+se inicie corretamente.<br>&nbsp;<br>
+</li>
+<li>Pode ser conveniente chamar o programa terminal <tt class="code">wtser</tt> 
+(Ou  <tt class="code">ltser</tt> no Linux) para comunicar com o Kit atrav&eacute;s da
+interface serial.</li>
+<li>Para apagar os arquivos intermedi&aacute;rios gerados por uma compila&ccedil;&atilde;o usa-se o comando
+<pre class="code">
+make clean
+</pre>
+</li>
+<li>
+O programa <a href="mon23.tgz">mon23.tgz</a> pode ser expandido, compilado e gravado na memória FLASH de forma similar.
+Este programa &eacute; um monitor e <i>boot-loader</i> de arquivos intel-hex.
+Se o programa <tt>mon23</tt> ja estiver gravado na mem&oacute;ria Flash do microcontrolador, 
+pode-se usar um outro m&eacute;todo para compilar e executar programas no LPC2378.
+O monitor <tt>mon23</tt> disp&otilde;e de um carregador de arquvos tipo Intel Hexadecimal, que
+permite caregar e executar programas na mem&oacute;ria RAM, sem a necessidade de programar a mem&oacute;ria Flash toda a vez que se deseja testar um programa. Isto tamb&eacute;m tem a vantagem de aumentar 
+a durabilidade do kit, porque a mem&oacute;ria Flash suporta um n&uacute;mero finito de apagamentos e grava&ccedil;&otilde;es. Para compilar o programa e envia-lo para a RAM pode-se usar a diretiva
+<pre class="code">
+make tser
+</pre>
+Ap&oacute;s este comanodo o computador estar&aacute; executando um terminal <tt>ltser</tt>, com o programa
+armazenado na RAM a partir do endere&ccedil;o <tt>0x40000000</tt>.
+Pode-se ent&atilde;o executar o programa usando o comando <b>P</b> do monitor.</li>
+</ul>
+<hr>
+<table width="100%" border=1>
+<tr><td class="nav"><a href="lpc-index.html">Anterior</a></td>
+    <td class="nav"><a href="lpc-index.html">Indice</a></td>
+    <td class="nav"><a href="lpc-02.html">Pr&oacute;ximo</a></td></tr>
+</table>
+</body>
+</html>

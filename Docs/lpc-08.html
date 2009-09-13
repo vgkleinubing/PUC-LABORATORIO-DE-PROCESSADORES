@@ -1,0 +1,385 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.0 Transitional//EN">
+<html><head>
+   <meta http-equiv="Content-Type" content="text/html; charset=ISO-8859-1">
+   <title>Lab. Processadores: Programa&ccedil;&atilde;o do LPC2378 usando o gcc</title>
+   <link rel="stylesheet" href="lpc-gcc.css" type="text/css">
+</head>
+<body>
+<center>
+<table cellpadding=2 width="100%">
+<tr><td width=61 align=center>
+<img src="../../fengpuc.png" alt="fenglogo" width=61 height=78></td>
+<td bgcolor="#BFCFDF">
+<center>
+<font face="Arial,Helvetica">
+Laborat&oacute;rio de Processadores
+<br>
+Programa&ccedil;&atilde;o do LPC2378 usando o arm-elf-gcc<br>
+Parte 8: Interface I<sup>2</sup>C: term&ocirc;metro TMP100 e smartcard
+</font>
+</center></td>
+<td width=61 align=center>
+<img src="../../puclogo.png" alt="puclogo" width=61 height=78></td></tr>
+</table>
+</center>
+<table width="100%" border=1>
+<tr><td class="nav" width="33%"><a href="lpc-07.html">Anterior</a></td>
+    <td class="nav" width="33%"><a href="lpc-index.html">Indice</a></td>
+    <td class="nav" width="33%"><a href="lpc-09.html">Pr&oacute;ximo</a></td></tr>
+</table>
+<a name="usoprog"></a><h3>Compila&ccedil;&atilde;o e uso do Programa</h3>
+<p>Neste exemplo vamos fazer o programa 
+<a href="a08_tmp101/">a08_tmp101</a> para fazer um rel&oacute;gio que tamb&eacute;m le a 
+temperatura atrav&eacute;s de uma interface I<sup>2</sup>C.
+Para configurar e testar o programa fazemos como de costume:
+<p><b>Configurar para gravar na mem&oacute;ria Flash</b>
+<p>Colocar o kit em modo de programa&ccedil;&atilde;o
+<p>Compilar e gravar a flash com o comando:
+<pre class="code">
+make isp
+</pre>
+Testar chamando o terminal <tt class="code">ltser</tt> e iniciar a execu&ccedil;&atilde;o apertando
+no bot&atilde;o de RESET.
+<p><b>Configurar para gravar na mem&oacute;ria RAM</b>
+<p>Pode-se executar o programa na RAM. At&eacute; os vertores de interrup&ccedil;&atilde;o
+podem rer remapeados para funcionar a partir da RAM a partir do endere&ccedil;o 0x40000000.
+Um registrador de configura&ccedil;&atilde;o do LPC2378 chamado MEMMAP permite remapear
+os vetores de interrup&ccedil;&atilde;o para a RAM.
+<p>O programa <a href="mon23/">mon23</a> inclui um carregador de arquivos *.hex que pode
+colocar o programa na RAM usando o terminal ltser. 
+Isto &eacute; feito automaticamente usando a diretiva <tt class="code">make tser</tt>
+deste projeto. Antes de executar <tt class="code">make tser</tt> &eacute; necess&aacute;rio
+que o monitor mon23 esteja gravado na Flash e sendo executado. 
+Ent&atilde;o basta fazer
+<pre class="code">make tser
+</pre>
+O programa ser&aacute; compilado com a configura&ccedil;&atilde;o para executar na RAM e
+carregado na RAM usando o terminal <tt class="code">ltser</tt>. Para executa-lo
+usa-se o comando <b>P</b> do monitor mon23.
+
+<h3>An&aacute;lise do programa: Configura&ccedil;&atilde;o da interface I<sup>2</sup>C</h3>
+Agora veremos como este programa foi feito, estudando os recursos do LPC2378 que foram usados.
+O programa foi subdividido em m&oacute;dulos conforme a tabela a seguir:
+<table border=0>
+<tr><td><a href="arm07/uart.c">uart.c</a></td>
+<td>Configura&ccedil;&atilde;o do clock e da interface serial.</td></tr>
+<tr><td><a href="arm07/i2c.c">i2c.c</a></td>
+<td>Rotinas de acesso &agrave; interface I<sup>2</sup>C para a configura&ccedil;&atilde;o
+e leitura do term&ocirc;metro TMP100</td></tr>
+<tr><td><a href="arm07/lcd.c">lcd.c</a></td><td>Configura&ccedil;&atilde;o e acesso ao display LCD</td></tr>
+<tr><td><a href="arm07/main.c">main.c</a></td>
+<td>Programa principal que faz um rel&oacute;gio com term&ocirc;metro.</td></tr>
+</table>
+<h3><a name="i2c"></a>Descri&ccedil;&atilde;o Gen&eacute;rica da interface I<sup>2</sup>C</h3>
+A interface I<sup>2</sup>C &eacute; um padr&atilde;o de comunica&ccedil;&atilde;o 
+criado pela Philips Semiconductors (Atualmente NXP) para possibilitar que microcontroladores 
+acessem dispositivos perif&eacute;ricos usando apenas 2 pinos de E/S.
+A velocidade de comunica&ccedil;&atilde;o pode ser de 0 a 100kBit/s no 
+modo padr&atilde;o ou at&eacute; 400kBit/s no modo r&aacute;pido (Fast mode).
+Como o modo r&aacute;pido exige certos cuidados especiais, como a termina&ccedil;&atilde;o 
+dos sinais e dispositivos especiais, vamos considerar apenas o modo padr&atilde;o.
+
+<p>
+A interface I<sup>2</sup>C usa dois sinais com acionamento de dreno aberto: 
+O SDA (Serial DAta) &eacute; usado para os dados seriais; e o SCL (Serial CLock) &eacute;
+um sinal de rel&oacute;gio usado para sincronizar os dados.
+O acionamento em dreno aberto significa que os dispositivos ligados ao barramento  I<sup>2</sup>C
+podem aterrar as linhas de sinal SDA ou SCL, mas n&atilde;o podem obriga-las a ir para n&iacute;vel alto.
+O n&iacute;vel alto nos sinais  I<sup>2</sup>C ocorre quando nenhum dispositivo ligado ao barramento
+est&aacute; puxando para baixo. Neste caso resistores externos <i>pull-up</i> fazem subir o n&iacute;vel
+de tens&atilde;o das linhas de sinal.
+<p>
+Existem dois tipos de dispositivo conectado a um barramento I<sup>2</sup>C: o mestre e os escravos.
+Normalmente so tem um mestre, podendo ter v&aacute;rios escravos. O mestre (geralmente o microcontrolador)
+&eacute; que toma a iniciativa nas transa&ccedil;&otilde;es, enquanto os escravos operam de modo passivo.
+<p>
+A sincroniza&ccedil;&atilde;o dos dados SDA com o clock &eacute; feita de 
+modo que SDA pode mudar enquanto SCL=0 e deve permanecer est&aacute;vel enquanto SCL=1. 
+Esta regra tem duas exe&ccedil;&otilde;es: o START bit e o STOP bit.
+<p><b>Escrita I<sup>2</sup>C.</b>
+<p>A escrita &eacute; feita na seguinte seq&uuml;&ecirc;ncia:
+<ol><li>Gera o START fazendo descer primeiro SDA e depois SCL</li>
+    <li>Escreve os 7 bits do endere&ccedil;o I<sup>2</sup>C do dispositivo.</li>
+    <li>Escreve o bit R/W, que para a escrita &eacute; zero.</li>
+    <li>Libera SDA para ler o ACK. O ACK da escrita &eacute; feito pelo 
+	perif&eacute;rico (escravo).</li>
+    <li>Escreve 8 bits de dados e recebe o ACK. Esta opera&ccedil;&atilde;o 
+	pode ser repetida para enviar v&aacute;rios bytes. </li>
+    <li>Gera o STOP, fazendo subir primeiro o SCL e depois SDA. </li>
+</ol>
+<img src="http://www.ee.pucrs.br/~stemmer/labproc/i2c/escritai2c.png" alt="Diagrama de tempo da escrita I2C">
+<p><b>Leitura I<sup>2</sup>C.</b>
+<p>A leitura &eacute; feita na seguinte seq&uuml;&ecirc;ncia:
+<ol><li>Gera o START fazendo descer primeiro SDA e depois SCL</li>
+    <li>Escreve os 7 bits do endere&ccedil;o I<sup>2</sup>C do dispositivo.</li>
+    <li>Escreve o bit R/W, que para a escrita &eacute; um.</li>
+    <li>O mestre libera o SDA e le o ACK gerado pelo perif&eacute;rico.</li>
+    <li>O mestre le os 8 bits de dados e gera o sinal ACK ou NACK. 
+	Esta opera&ccedil;&atilde;o pode ser repetida para ler 
+	v&aacute;rios bytes na mesma transa&ccedil;&atilde;o.
+	O mestre deve responder NACK no &uacute;ltimo byte lido e ACK nos outros bytes.</li>
+    <li>Gera o STOP, fazendo subir primeiro o SCL e depois SDA. </li>
+</ol>
+<img src="http://www.ee.pucrs.br/~stemmer/labproc/i2c/leiturai2c.png" alt="Diagrama de tempo da leitura I2C">
+<p>Na figura acima os dados em <font color="#006f00">Verde</font> s&atilde;o gerados pelo
+microprocessador e em  <font color="#ff0000">Vermelho</font> 
+s&atilde;o as respostas do perif&eacute;rico.
+Observe que no &uacute;ltimo dado lido o microcontrolador responde NACK.
+<h3>O term&ocirc;metro I<sup>2</sup>C tipo TMP100</h3>
+<p>O TMP100 da Texas Instruments &eacute; um sensor de temperatura com calibra&ccedil;&atilde;o e convers&atilde;o para 
+digital interna, fornecendo a temperatura em graus Celcius atrav&eacute;s de uma interface I<sup>2</sup>C.
+<p>O TMP100 tem pinos de endere&ccedil;o que permitem configura-lo para atender em endere&ccedil;os que v&atilde;o de
+0x90 a 0x9E.
+No nosso kit de Lab. Processadores o TMP100 est&aacute; configurado para atender no endere&ccedil;o 0x96.
+Desejamos fazer com ele dois tipos de opera&ccedil;&atilde;o: Escrever no registrador de configura&ccedil;&atilde;o
+e ler a temperatura.
+<p><b>Registrador de configura&ccedil;&atilde;o:</b>
+<blockquote>Os bits deste registrador permitem configurar o TMP100
+para a m&aacute;xima resolu&ccedil;&atilde;o: 1/16 Grau Celcius. Os bits do Registrador de configura&ccedil;&atilde;o
+s&atilde;o os seguintes:
+<table border=1>
+<tr><td>7</td><td>6</td><td>5</td><td>4</td><td>3</td><td>2</td><td>1</td><td>0</td></tr>
+<tr><td>OS/ALERT</td><td>R1</td><td>R0</td><td>F1</td><td>F0</td><td>POL</td><td>TM</td><td>SD</td></TR>
+</table>
+<br>No caso os bits R1 e R0 definem a resolu&ccedil;&atilde;o. 11 corresponde a uma resolu&ccedil;&atilde;o de 1/16 grau Celcius.
+Veja a fun&ccedil;&atilde;o dos outros bits no manual do TMP100. No nesso programa vamos usar o valor 0x60 neste registrador.
+Para programa-lo temos que fazer a seguinte sequencia de opera&ccedil;&otilde;es:
+<ul>	<li>Gerar o START bit para iniciar a transa&ccedil;&atilde;o.</li>
+	<li>Escrever o endere&ccedil;o 0x96</li>
+	<li>Escrever o n&uacute;mero de acesso ao registrador de configura&ccedil;&atilde;o: 0x01</li>
+	<li>Escrever o valor do registrador de configura&ccedil;&atilde;o: 0x60</li>
+	<li>Gerar o STOP bit</li>
+</ul>
+</blockquote>
+<p><b>Leitura da Temperatura</b>
+<blockquote>Antes de poder ler a temperatura &eacute; necessario escrever o valor 0 (zero) para selecionar o registrador de temperatura.
+A temperatura aparece em 2 bytes: o primeiro tem a parte inteira de graus Celcius. O segundo tem a parte fracion&aacute;ria,
+com os bits alinhados &agrave; esquerda. Portanto as seguintes opera&ccedil;&otilde;es s&atilde;o necess&aacute;rias:
+<ul>	<li>Gerar o START bit para iniciar a transa&ccedil;&atilde;o.</li>
+	<li>Escrever o endere&ccedil;o 0x96</li>
+	<li>Escrever o n&uacute;mero de acesso &agrave; leitura da temperatura 0x00</li>
+	<li>Gerar o STOP bit</li>
+	<li>Gerar um START</li>
+	<li>Escrever o endere&ccedil;o 0x97 para leitura</li>
+	<li>Ler a parte inteira da temperatura</li>
+	<li>Ler a parte fracion&aacute;ria da temperatura (com NACK)</li>
+	<li>Gerar o STOP</li>
+</ul>
+</blockquote>
+<h3><a name="i2c_lpc2378"></a>A interface I<sup>2</sup>C no LPC2378</h3>
+<p>Os microcontroladores da fam&iacute;lia LPC23xx possuem hardware dedicado para comunicar-se atrav&eacute;s de uma
+interface I<sup>2</sup>C. Podem ser configurados para atuar como mestre ou como escravo. Na leitura do TMP100 queremos que 
+o microcontrolador seja o mestre.
+<p>O LPC2378 tem 3 interfaces I<sup>2</sup>C suportadas em hardware. No kit temos um term&ocirc;metro tipo TMP100
+conectado &agrave; interface n&uacute;mero 2. Os seguintes registradores s&atilde;o relevantes para este programa:
+<table border=0 cellpadding=8>
+<tr><td width=100 class="code">I2C2SCLH<br>0xE0080010</td>
+	<td>Divisor que determina o tempo alto do clock SCL</td></tr>
+<tr><td width=100 class="code">I2C2SCLL<br>0xE0080014</td>
+	<td>Divisor que determina o tempo baixo do clock SCL</td></tr>
+<tr><td width=100 class="code">I2C2CONCLR<br>0xE0080018</td>
+	<td>Apaga bits do registrador de controle do I<sup>2</sup>C.</td></tr>
+<tr><td width=100 class="code">I2C2CONSET<br>0xE0080000</td>
+	<td>Liga bits do registrador de controle do I<sup>2</sup>C.
+	Os bits s&atilde;o os seguintes:
+	<table border=1>
+		<tr><th>Bit</th><th>Valor</th><th>S&iacute;mbolo</th><th>Descri&ccedil;&atilde;o</th></tr>
+		<tr><td>7</td><td>0x80</td><td> - </td><td>N&atilde;o usado</td></tr>
+		<tr><td>6</td><td>0x40</td><td>I2EN</td><td>Habilita o funcionamento da interface I<sup>2</sup>C</td></tr>
+		<tr><td>5</td><td>0x20</td><td>STA</td><td>Inicia uma transa&ccedil;&atilde;o gerando um START bit</td></tr>
+		<tr><td>4</td><td>0x10</td><td>STO</td><td>Escrevendo 1 aqui gera um STOP bit</td></tr>
+		<tr><td>3</td><td>0x08</td><td>SI</td><td>Indicador de Interrup&ccedil;&atilde;o: Liga quando mudou o estado.</td></tr>
+		<tr><td>2</td><td>0x04</td><td>AA</td><td>Determina que ap&oacute;s a leitura deve gerar ACK</td></tr>
+		<tr><td>1</td><td> - </td><td>N&atilde;o usado</td></tr>
+		<tr><td>0</td><td> - </td><td>N&atilde;o usado</td></tr>
+	</table>
+</td></tr>
+<tr><td width=100 class="code">I2C2STAT<br>0xE0080004</td>
+	<td>Os bits 7 a 3 deste registrador indicam o estado de uma transa&ccedil;&atilde;o I<sup>2</sup>C
+	em andamento. Os bits 0, 1 e 2 s&atilde;o sempre 0. O softare deve consultar este registrador
+	para verificar qual &acute; a pr&oacute;xima coisa a fazer.</td></tr>
+<tr><td width=100 class="code">I2C2DAT<br>0xE0080008</td>
+	<td>Byte de dados. Neste registrador pode-se ler um byte recebido ou 
+	escrever para transmitir um byte.</td></tr>
+</table>
+<p><b>Configura&ccedil;&atilde;o inicial</b>
+<p>O manual da NXP recomenda configurar a interface I<sup>2</sup>C para gerar interup&ccedil;&atilde;o
+sempre que ocorre uma mudan&ccedil;a de estado. Para n&atilde;o complicar demais logo no in&iacute;cio,
+vou primeiro mostrar como funciona o programa <a href="arm07/">arm07/</a> que le o TMP100 sem usar
+interrup&ccedil;&atilde;o.
+<p>O seguinte trecho de c&oacute;digo inicializa a interface deixando-a prota para uso:
+<pre class="code">
+/* Inicializa o canal 2 de I2C */
+void ini_i2c(void)
+{
+PINSEL0 &amp;= 0xffafffff;
+PINSEL0 |= 0x00a00000;	/* Seleciona pinos do SDA2 e SCL2 */
+I22CONCLR = 0xff;
+I22CONSET = 0x40;	/* Habilita o I2C-2 um modo mestre */
+I22SCLH   = 100;	/* Tempo alto do SCL	*/
+I22SCLL   = 100;	/* Tempo baixo do SCL	*/
+}
+</pre>
+<p>Tres coisas precisam ser feitas: Selecionar os pinos dos sinais SDA2 e SCL2 no seletor
+de fun&ccedil;&otilde;s dos pinos; habilitar a interface I<sup>2</sup>C2 em modo mestre e
+configurar a frequ&ecirc;ncia do clock de I<sup>2</sup>C. 
+Com o valor 100 escrito em I22SCLH e I22SCLL obt&eacute;m-se um clock I<sup>2</sup>C de 60kHz 
+quando o clock principal &eacute; de 12MHz.
+<p><b>Escrita</b>
+<p>A escrita inicia ligando o bit STA no I22CONSET.
+As opera&ccedil;&otilde;es subsequentes s&atilde;o feitas a medida que a
+leitura do I22STAT indica que as etapas ateriores foram conclu&iacute;das.
+<pre class="code">
+/* Escreve 2 bytes na interface i2c. Se val&lt;0 escreve so o dado. */
+void escreve_i2c(int addr, int dado, int val)
+{
+int n;	/* Conta bytes a escrever */
+int i;	/* Conta votas esperando no loop (timeout) */
+/* Inicia a transacao: Envia o endereco 0x90 para escrita no TMP101 */
+I22CONCLR = 0xFF;	/* Limpa bits de controle */
+I22CONSET = 0x60;	/* Habilita e gera START */
+k=2; i=1000;
+do	{
+	switch(I22STAT){
+		case 0x08: /* Terminou START; envia endereco */
+			I22CONCLR=0x20;
+		case 0x20: /* NACK do endreco: reenvia */
+			I22DAT = addr; I22CONCLR=8; i=1000; break;
+		case 0x18: /* ACK do endereco: envia dado */
+			I22DAT = dado; I22CONCLR=8; i=1000; break;
+		case 0x28: /* ACK do dado */
+			if(k &lt; 2) I22CONSET = 0x10;	/* Gera STOP */
+			else I22DAT=val;	/* Envia outro dado */
+			I22CONCLR=8; 
+			i=1000; k--;
+			break;
+		}
+	} while(k &amp;&amp; --i);
+}
+</pre>
+<p><b>Acesso ao I<sup>2</sup>C com interup&ccedil;&atilde;o</b>
+<p>O hardware de I<sup>2</sup>C pode gerar interup&ccedil;&atilde;o sempre que uma
+etapa da transa&ccedil;&atilde;o &eacute; conclu&iacute;da.
+O programa <a href="letmp100/">letmp100/</a> implementa um rel&oacute;gio que tamb&eacute;m
+le um term&ocirc;metro tipo TMP100 ligado no I<sup>2</sup>C n&uacute;mero 2, usando
+interrup&ccedil;&atilde;o.
+<p>A inicializa&ccedil;&atilde;o do I<sup>2</sup>C com 
+interrup&ccedil;&atilde;o pode ser feita com o seguinte trecho de c&oacute;digo:
+<pre class="code">
+/* Inicializa o canal 2 de I2C com interrupcao */
+void ini_i2c(void)
+{
+PCONP |= 0x04000080;	/* Liga energia do I2C0 e I2C2 */
+PINSEL0 &amp;= 0xffafffff;
+PINSEL0 |= 0x00a00000;	/* Seleciona pinos do SDA2 e SCL2 */
+I22CONCLR = 0xff;
+I22CONSET = 0x40;	/* Habilita o I2C-2 um modo mestre */
+I22SCLH   = 100;	/* Tempo alto do SCL	*/
+I22SCLL   = 100;	/* Tempo baixo do SCL	*/
+
+/* Habilita a interrupcao do i2c2 como IRQ no VIC	*/
+desabilitaIRQ();	/* Definida no #include "vic_cpsr.h"	*/
+VICIntSelect &amp;= ~0x40000000;	/* i2c2=bit 30 como IRQ	*/
+VICIntEnable |= 0x40000000;	/* Habilita int do i2c2 no VIC*/
+VICVectAddr30 = (int)IRQ_i2c2;	/* Vetor para atendimento do I2C2 */
+i2cn=0;
+habilitaIRQ();	/* Definida no #include "vic_cpsr.h"	*/
+I22CONSET=0x10;
+}
+</pre>
+<p>A opera&ccedil;&atilde;o <tt class="code">habilitaIRQ();</tt>
+&eacute; feita usando uma macro definida no arquivo de cabe&ccedil;alho
+<tt class="code">vic.cpsr.h</tt> para gerar uma sequ&ecirc;ncia de 
+instru&ccedil;&otilde;es em assembly para ligar o bit de habilita&ccedil;&atilde;o 
+da IRQ no registrador de status CPSR:
+<pre class="code">
+#define habilitaIRQ() asm volatile(\
+	"mrs r3, cpsr\n" \
+	"bic r3, r3, # 0x80\n" \
+	"msr cpsr, r3\n")
+</pre>
+<p>A rotina de atendimento da IRQ da interface I<sup>2</sup>C &eacute;
+implementada como uma m&aacute;quina de estados com diretivas tipo <b>switch-case</b>.
+Dependendo da opera&ccedil;&atilde;o que foi conclu&iacute;da a rotina
+decide qual &eacute; a pr&oacute;xima coisa a ser feita:
+<pre class="code">
+<span style="font-style: italic;color: #808080;">/* Variaveis globais da Interrupcao i2c */</span>
+<span style="color: #800000;">char</span><span style="color: #000000;"> i2cdados[</span><span style="color: #0000ff;">32</span><span style="color: #000000;">];	</span><span style="font-style: italic;color: #808080;">/* Buffer de dados lidos ou escritos */</span>
+<span style="color: #800000;">int</span><span style="color: #000000;"> slvaddr;		</span><span style="font-style: italic;color: #808080;">/* Endereco do dispositivo i2c	*/</span>
+<span style="color: #800000;">int</span><span style="color: #000000;"> i2cn;		</span><span style="font-style: italic;color: #808080;">/* Numero de bytes a ler/escrever */</span>
+
+<span style="color: #800000;">void</span><span style="color: #000000;"> IRQ_i2c2(</span><span style="color: #800000;">void</span><span style="color: #000000;">) __attribute__ ((interrupt(</span><span style="color: #dd0000;">"IRQ"</span><span style="color: #000000;">)));</span>
+<span style="font-style: italic;color: #808080;">/*</span>
+<span style="font-style: italic;color: #808080;">A rotina de interrupcao do I2C implementa uma maquina de estados.</span>
+<span style="font-style: italic;color: #808080;">Dependendo do valor do I22STAT sabe o que foi feito e qual e' a</span>
+<span style="font-style: italic;color: #808080;">proxima coisa a fazer. */</span>
+<span style="color: #800000;">void</span><span style="color: #000000;"> IRQ_i2c2(</span><span style="color: #800000;">void</span><span style="color: #000000;">)</span>
+<span style="color: #000000;">{</span>
+<span style="color: #800000;">static int</span><span style="color: #000000;"> k;</span>		<span style="font-style: italic;color: #808080;">/* Indice do array de dados */</span>
+<span style="color: #000000;">I22CONSET = </span><span style="color: #0000ff;">4</span><span style="color: #000000;">;		</span><span style="font-style: italic;color: #808080;">/* Normalmente responde ACK */</span>
+<span style="font-weight: bold;color: #000000;">switch</span><span style="color: #000000;">(I22STAT){</span>
+<span style="color: #000000;">	</span><span style="font-weight: bold;color: #000000;">case</span><span style="color: #000000;"> </span><span style="color: #0000ff;">0</span><span style="color: #000000;">:	</span><span style="font-weight: bold;color: #000000;">case</span><span style="color: #000000;"> </span><span style="color: #008080;">0x20</span><span style="color: #000000;">:	</span><span style="font-style: italic;color: #808080;">/* Erro */</span>
+<span style="color: #000000;">	</span><span style="font-weight: bold;color: #000000;">case</span><span style="color: #000000;"> </span><span style="color: #008080;">0x30</span><span style="color: #000000;">:	</span><span style="font-style: italic;color: #808080;">/* Dado foi escrito recebendo NACK */</span>
+<span style="color: #000000;">	</span><span style="font-weight: bold;color: #000000;">case</span><span style="color: #000000;"> </span><span style="color: #008080;">0x48</span><span style="color: #000000;">:	</span><span style="font-style: italic;color: #808080;">/* Endereco de leitura recebeu NACK */</span>
+<span style="color: #000000;">		I22CONSET = </span><span style="color: #008080;">0x10</span><span style="color: #000000;">;	</span><span style="font-style: italic;color: #808080;">/* Gera STOP */</span>
+<span style="color: #000000;">		i2cn=-</span><span style="color: #0000ff;">1</span><span style="color: #000000;">;		</span><span style="font-style: italic;color: #808080;">/* i2cn=-1 indica erro */</span>
+<span style="color: #000000;">		</span><span style="font-weight: bold;color: #000000;">break</span><span style="color: #000000;">;</span>
+<span style="color: #000000;">	</span><span style="font-weight: bold;color: #000000;">case</span><span style="color: #000000;"> </span><span style="color: #0000ff;">8</span><span style="color: #000000;">:		</span><span style="font-style: italic;color: #808080;">/* Terminou de enviar o START bit */</span>
+<span style="color: #000000;">		I22CONCLR=</span><span style="color: #008080;">0x20</span><span style="color: #000000;">;</span>
+<span style="color: #000000;">		I22DAT = slvaddr;	</span><span style="font-style: italic;color: #808080;">/* Escreve endereco	*/</span>
+<span style="color: #000000;">		k=</span><span style="color: #0000ff;">0</span><span style="color: #000000;">;</span>
+<span style="color: #000000;">		</span><span style="font-weight: bold;color: #000000;">break</span><span style="color: #000000;">;</span>
+<span style="color: #000000;">	</span><span style="font-weight: bold;color: #000000;">case</span><span style="color: #000000;"> </span><span style="color: #008080;">0x18</span><span style="color: #000000;">:	</span><span style="font-style: italic;color: #808080;">/* Enviou endereco de escrita recebendo ACK */</span>
+<span style="color: #000000;">	</span><span style="font-weight: bold;color: #000000;">case</span><span style="color: #000000;"> </span><span style="color: #008080;">0x28</span><span style="color: #000000;">:	</span><span style="font-style: italic;color: #808080;">/* Escreveu dado recebendo ACK */</span>
+<span style="color: #000000;">		</span><span style="font-style: italic;color: #808080;">/* Escreve mais dados */</span>
+<span style="color: #000000;">		</span><span style="font-weight: bold;color: #000000;">if</span><span style="color: #000000;">(i2cn) { I22DAT = i2cdados[k++]; i2cn--; }</span>
+<span style="color: #000000;">		</span><span style="font-weight: bold;color: #000000;">else</span><span style="color: #000000;"> I22CONSET=</span><span style="color: #008080;">0x14</span><span style="color: #000000;">;	</span><span style="font-style: italic;color: #808080;">/* Fim dos dados: gera STOP */</span>
+<span style="color: #000000;">		</span><span style="font-weight: bold;color: #000000;">break</span><span style="color: #000000;">;</span>
+<span style="color: #000000;">	</span><span style="font-weight: bold;color: #000000;">case</span><span style="color: #000000;"> </span><span style="color: #008080;">0x40</span><span style="color: #000000;">:	</span><span style="font-style: italic;color: #808080;">/* Enviou endereco de leitura e recebeu ACK */</span>
+<span style="color: #000000;">	</span><span style="font-style: italic;color: #808080;">/* Prepara para iniciar a leitura de dados */</span>
+<span style="color: #000000;">		i2cdados[</span><span style="color: #0000ff;">0</span><span style="color: #000000;">]=I22DAT; k=</span><span style="color: #0000ff;">0</span><span style="color: #000000;">; </span><span style="font-style: italic;color: #808080;">/* Le lixo so para iniciar */</span>
+<span style="color: #000000;">		</span><span style="font-weight: bold;color: #000000;">if</span><span style="color: #000000;">(i2cn==</span><span style="color: #0000ff;">1</span><span style="color: #000000;">) I22CONCLR=</span><span style="color: #0000ff;">4</span><span style="color: #000000;">; </span><span style="font-style: italic;color: #808080;">/* So 1 dado responde NACK */</span>
+<span style="color: #000000;">		</span><span style="font-weight: bold;color: #000000;">break</span><span style="color: #000000;">;</span>
+<span style="color: #000000;">	</span><span style="font-weight: bold;color: #000000;">case</span><span style="color: #000000;"> </span><span style="color: #008080;">0x50</span><span style="color: #000000;">:	</span><span style="font-style: italic;color: #808080;">/* Dado recebido enviando ACK */</span>
+<span style="color: #000000;">		i2cdados[k++]=I22DAT;	</span><span style="font-style: italic;color: #808080;">/* Le o proximo dado */</span>
+<span style="color: #000000;">		</span><span style="font-style: italic;color: #808080;">/* Se for o ultimo envia NACK */</span>
+<span style="color: #000000;">		</span><span style="font-weight: bold;color: #000000;">if</span><span style="color: #000000;">(!(--i2cn)) I22CONCLR=</span><span style="color: #0000ff;">4</span><span style="color: #000000;">;</span>
+<span style="color: #000000;">		</span><span style="font-weight: bold;color: #000000;">break</span><span style="color: #000000;">;</span>
+<span style="color: #000000;">	</span><span style="font-weight: bold;color: #000000;">case</span><span style="color: #000000;"> </span><span style="color: #008080;">0x58</span><span style="color: #000000;">:	</span><span style="font-style: italic;color: #808080;">/* Leu enviando NACK */</span>
+<span style="color: #000000;">		i2cdados[k++]=I22DAT;	</span><span style="font-style: italic;color: #808080;">/* Le o ultimo dado */</span>
+<span style="color: #000000;">		i2cn=</span><span style="color: #0000ff;">0</span><span style="color: #000000;">;</span>
+<span style="color: #000000;">		I22CONSET=</span><span style="color: #008080;">0x10</span><span style="color: #000000;">;	</span><span style="font-style: italic;color: #808080;">/* Gera STOP */</span>
+<span style="color: #000000;">		</span><span style="font-weight: bold;color: #000000;">break</span><span style="color: #000000;">;</span>
+<span style="color: #000000;">	}</span>
+<span style="color: #000000;">I22CONCLR = </span><span style="color: #0000ff;">8</span><span style="color: #000000;">;	</span><span style="font-style: italic;color: #808080;">/* Limpa o indicador de interrupcao do I2C */</span>
+<span style="color: #000000;">VICVectAddr = </span><span style="color: #0000ff;">0</span><span style="color: #000000;">;	</span><span style="font-style: italic;color: #808080;">/* Limpa o vetor do VIC */</span>
+<span style="color: #000000;">}</span>
+</pre>
+Para fazer uma escrita ou leitura da interface I<sup>2</sup>C agora basta colocar os dados 
+nas variaveis globais
+<pre class="code">
+char i2cdados[32];	/* Buffer de dados lidos ou escritos */
+int slvaddr;		/* Endereco do dispositivo i2c	*/
+int i2cn;		/* Numero de bytes a ler/escrever */
+</pre>
+e iniciar a transa&ccedil;&atilde;o escrevendo 0x20 no I22CONSET. 
+Isto faz com que um START bit seja emitido. Depois disto a rotina de interrup&ccedil;&atilde;o
+faz as opera&ccedil;&otilde;es necess&aacute;rias para concluir a transa&ccedil;&atilde;o.
+Apenas devemos cuidar para dar tempo para que isto seja feito.
+<a name="ref"></a><h3>Refer&ecirc;ncias</h3>
+<ul>
+<li><a href="http://www.ee.pucrs.br/~stemmer/labproc/i2c/index.html">Apostila sobre o protocolo I<sup>2</sup>C.</a></li>
+<li><a href="http://focus.ti.com/lit/ds/symlink/tmp100.pdf">tmp100.pdf</a> Manual do TMP100 na Texas Instruments.</li>
+<li><a href="http://www.gaw.ru/pdf/Holtek/rom/24lc02.PDF">24lc02.PDF</a> O SmartCard tem as mesmas
+caracter&iacute;sticas de interface que a mem&oacute;ria flash i2c tipo 24LC02. Estas informa&ccedil;&otilde;es podem ser usadas para acessar o SmartCard.</li>
+<li><a href="http://en.wikipedia.org/wiki/I²C">http://en.wikipedia.org/wiki/I²C</a> 
+Explica&ccedil;&atilde;o sobre I<sup>2</sup>C na Wikipedia</li>
+</ul>
+<hr>
+<table width="100%" border=1>
+<tr><td class="nav" width="33%"><a href="lpc-07.html">Anterior</a></td>
+    <td class="nav" width="33%"><a href="lpc-index.html">Indice</a></td>
+    <td class="nav" width="33%"><a href="lpc-09.html">Pr&oacute;ximo</a></td></tr>
+</table>
+</body>
+</html>

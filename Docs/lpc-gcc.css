@@ -1,0 +1,57 @@
+/*
+Tabela de estilos css da apostila de programacao do kit lpc2378
+de Lab Processadores 2009-2 usando arm-elf-gcc
+Escrito por Marcos A. Stemmer
+*/
+body	{
+	background-color: #ffffff;
+	font-family: sans-serif;
+	}
+
+th	{
+	background-color: #BFCFDF;
+	}
+
+td	{
+	vertical-align: top;
+	}
+
+td.flash	{
+	vertical-align: top;
+	background-color: #ffe0b0
+	}
+
+td.ram	{
+	vertical-align: top;
+	background-color: #c0ffb0
+	}
+
+td.nav	{
+	text-align: center;
+	background-color: #BFCFDF;
+	width: 33%
+	}
+
+td.item	{
+	text-align: center;
+	background-color: #BFDFCF;
+	}
+
+td.code {
+	vertical-align: top;
+	color: #5f1f00;
+	font-family: monospace
+	}
+
+pre.code {
+	color: #5f1f00;
+	background-color: #e9e9e9;
+	border: 1px solid #050505;
+	padding: .5em 1em;
+/*	margin: 0 1em;*/
+	}
+
+tt.code {
+	color: #5f1f00;
+	font-family: monospace
+	}

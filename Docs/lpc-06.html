@@ -1,0 +1,203 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.0 Transitional//EN">
+<html><head>
+   <meta http-equiv="Content-Type" content="text/html; charset=ISO-8859-1">
+   <title>Lab. Processadores: Programa&ccedil;&atilde;o do LPC2378 usando o gcc</title>
+   <link rel="stylesheet" href="lpc-gcc.css" type="text/css">
+</head>
+<body>
+<center>
+<table cellpadding=2 width="100%">
+<tr><td width=61 align=center>
+<img src="../../fengpuc.png" alt="fenglogo" width=61 height=78></td>
+<td bgcolor="#BFCFDF">
+<center>
+<font face="Arial,Helvetica">
+Laborat&oacute;rio de Processadores
+<br>
+Programa&ccedil;&atilde;o do LPC2378 usando o arm-elf-gcc<br>
+Parte 6: Sistema de Clock e PLL
+</font>
+</center></td>
+<td width=61 align=center>
+<img src="../../puclogo.png" alt="puclogo" width=61 height=78></td></tr>
+</table>
+</center>
+<table width="100%" border=1>
+<tr><td class="nav" width="33%"><a href="lpc-05.html">Anterior</a></td>
+    <td class="nav" width="33%"><a href="lpc-index.html">Indice</a></td>
+    <td class="nav" width="33%"><a href="lpc-07.html">Pr&oacute;ximo</a></td></tr>
+</table>
+<p>Neste exemplo vamos fazer o programa 
+<a href="a06_pll/">a06_pll</a> para testar a configura&ccedil;&atilde;o
+do sistema de clock, e do PLL de modo a alterar a ffrequ&ecirc;ncia de 
+opera&ccedil;&atilde;o da CPU.
+<p>Neste programa usaremos um m&oacute;dulo adicional chamado <tt class="code">
+uart.c</tt> onde est&atilde;o as fun&ccedil;&otilde;es de configura&ccedil;&atilde;o
+do Clock/PLL e da porta serial.
+<h3>Instru&ccedil;&otilde;es para compilar e usar</h3>
+<p>Iniciar expandindo o arquivo <tt class="code"><a href="a06_pll.tgz">a06_pll.tgz</a></tt>
+e abrindo um <i>shell</i> e entrando no diret&oacute;rio 
+<tt class="code">a06_pll</tt>. Prepara-se o microprocessador para programar a Flash,
+conectando o cabo serial e colocando em modo de programa&ccedil;&atilde;o.
+Ent&atilde;o pode-se compilar o programa e gravar na Flash com o comando
+<pre class="code">
+make isp
+</pre>
+Para testar o programa recomenda-se usar um teminal serial, como o 
+<a href="ltser.exe">ltser.exe</a>. Como o ltser foi configurado por default para
+9600Baud, &eacute; necess&aacute;rio chama-lo especificando que baud-rate deve ser de 19200 Baud usando seguinte linha de comando:
+<pre class="code">ltser b=19200</pre>
+<p>Tendo o programa <tt class="code">mon23</tt> instalado na FLASH e sendo executado, 
+pode-se testar este programa rodando na RAM. Para isto usa-se o comando
+<pre class="code">
+make tser
+</pre>
+Este comando compila o programa e envia-o para a RAM usando o terminal <tt class="code">ltser</tt>.
+Para executar o programa usa-se o comando "P" do monitor <tt class="code">mon23</tt>.
+
+<a name="clock"></a>
+<h3>Sistema de Clock do LPC2378</h3>
+<p>Os microcontroladores tipo LPC23xx tem um sistema de gera&ccedil;&atilde;o
+de clock bastante complexo e configur&aacute;vel. 
+Para come&ccedil;ar existem tres osciladores que podem servir como base
+para as temporiza&ccedil;&otilde;es do LPC2378:
+<ul>	<li>
+	Um oscilador interno de 4MHz, totalmente incorporado no chip, permite
+	que o microcontrolador funcione sem qualquer componente externo.
+	Este oscilador &eacute; usado inicialmente, antes que qualquer 
+	configura&ccedil;&atilde;o tenha sido feita.
+	</li><li>
+	Um oscilador que usa um cristal ressonante externo, que no nosso kit
+	finciona a 12MHz.
+	</li><li>
+	Um oscilador de 32768Hz alimentado por bateria, feito para manter o
+	rel&oacute;gio RTC funcionando at&eacute; com o microcontrolador desligado.
+	</li>
+</ul>
+<p><img src="clock.png" alt="Sistema de Clock do LPC2378">
+<p>
+O registrador <tt class="code">CLKSRCSEL</tt> seleciona qual destes osciladores
+ser&aacute; usado como base para as demais temporiza&ccedil;&otilde;es.
+Para usar o oscilador externo de 12MHz &eacute; necess&aacute;rio liga-lo
+e esperar at&eacute; que ele esteja estabilizado. Isto &eacute; feito
+usando o registrador <tt class="code">SCS</tt>.
+Portanto usaremos os seguintes registradores na configura&ccedil;&atilde;o
+do clock:
+<table border=0 cellpadding=8>
+<tr><td width=100 class="code">SCS<br>0xE01FC1A0</td>
+	<td>System Control Status: Configura&ccedil;&otilde;es variadas.<br>
+	bit 0: Habilita modo Fast do GPIO. Neste modo deve-se usar instru&ccedil;&otilde;es tipo FIOxPIN para
+acessar as portas P0 e P1.<br>
+	bit 5: Liga o oscilador externo.<br>
+	bit 6: Indica oscilador externo funcionando. Pode ser usado.
+	</td></tr>
+<tr><td width=100 class="code">CCLKCFG<br>0xE01FC104</td>
+	<td>
+	Configura o divisor de clock para a CPU. O valor a ser escrito &eacute; o 
+	divisor-1. O valor do divisor, se não for um, deve ser par.
+	</td></tr>
+<tr><td width=100 class="code">CLKSRCSEL<br>0xE01FC10C</td>
+	<td>
+	Seleciona o oscilador de clock a ser ligado ao PLL<br>
+	valor 0: Conecta ao oscilador interno de 4MHz<br>
+	valor 1: Conecta ao oscilador externo 12MHz<br>
+	valor 2: Usa o oscolador do RTC
+	</td></tr>
+<tr><td width=100 class="code">PLLCON<br>0xE01FC080</td>
+	<td>
+	Conecta ou habilita o PLL<br>
+	bit 0: Habilita o funcionamento do PLL<br>
+	bit 1: Conecta o PLL &agrave; CPU
+	</td></tr>
+<tr><td width=100 class="code">PLLCFG<BR>0xE01FC084</td>
+	<td>
+	Configura o multiplicador e o divisor do PLL:<br>
+	bit  0 a 14: <tt class="code">MSEL</tt> (Multiplicador/2)-1<br>
+	bit 16 a 23: <tt class="code">NSEL</tt> Divisor-1<br>
+	</td></tr>
+<tr><td width=100 class="code">PLLSTAT<BR>0xE01FC088</td>
+	<td>
+	Somente leitura. Le a configura&ccedil;&atilde;o do PLL.
+	bit  0 a 14: <tt class="code">MSEL</tt> Multiplicador-1<br>
+	bit 16 a 23: <tt class="code">NSEL</tt> Divisor-1<br>
+	bit 24: <tt class="code">PLLE</tt> Indica que o PLL est&aacute; habilitado<br>
+	bit 25: <tt class="code">PLLC</tt> PLL conectado &agrave; CPU<br>
+	bit 26: <tt class="code">PLLLOCK</tt> PLL travado na frequencia desejada<br>
+	</td></tr>
+<tr><td width=100 class="code">PLLFEED<BR>0xE01FC08C</td>
+	<td>
+	Para que altera&ccedil;&otilde;es de configura&ccedil;&atilde;o do PLL tenham efeito &eacute; necess&aacute;rio
+	escrever os valores 0xAA e 0x55 neste registrador.
+	</td></tr>
+</table>
+<p>Desta forma temos no m&oacute;dulo <tt class="code">uart.c</tt> uma
+fun&ccedil;&atilde;o chamada PLL_Init que configura o multiplicador do PLL e 
+o divisor <tt class="code">CCLKCFG</tt> para fazer com que o n&uacute;cleo do
+microcontrolador opere a uma frequencia <tt class="code">cpuclock</tt>
+de acordo com a f&oacute;rmula:
+<p><tt class="code">cpuclock = 12MHz*(pllmulti/cpudiv)</tt>
+<p>O PLL tem um oscilador controlado por corrente (o CCO) que oscila em uma
+frequ&ecirc;ncia m&uacute;ltipla da frequ&ecirc;ncia do oscilador de refer&ecirc;ncia.
+O CCO oscila em frequ&ecirc;ncias que podem variar de 275MHz a 550MHz.
+<p>Ajustando os campos <tt class="code">MSEL</tt> e <tt class="code">NSEL</tt>
+pode-se ajustar a frequ&ecirc;ncia do CCO:
+<p><tt class="code">CCO freq = 2*(MSEL+1)/(NSEL+1)*12MHz</tt>
+<p>A oscila&ccedil;&atilde;o do CCO entra no microcontrolador dividida por 2,
+como o sinal <tt class="code">SYSCLK</tt>. Este sinal &eacute; dividido por
+<tt class="code">CCLKCFG + 1</tt> para gerar o clock <tt class="code">CCLK</tt>
+usado no n&uacute;cleo do microcontrolador. Este clock <tt class="code">CCLK</tt>
+pode ainda passar por um divisor por 1,2,4 ou 8 espec&iacute;fico para cada perif&eacute;rico, controlado pelos registradores <tt class="code">PCLKSEL0</tt> 
+e <tt class="code">PCLKSEL1</tt>.
+<pre class="code">
+<span style="color: #800000;">int</span><span style="color: #000000;"> cpuclock;	</span><span style="font-style: italic;color: #808080;">/* Frequencia efetiva usada no sistema */</span>
+
+<span style="font-style: italic;color: #808080;">/* Configura o clock com o PLL. */</span>
+<span style="color: #800000;">int</span><span style="color: #000000;"> PLL_Init(</span><span style="color: #800000;">int</span><span style="color: #000000;"> pllmulti, </span><span style="color: #800000;">int</span><span style="color: #000000;"> cpudiv)</span>
+<span style="color: #000000;">{</span>
+<span style="color: #800000;">int</span><span style="color: #000000;"> k;</span>
+<span style="color: #000000;">cpudiv &amp;= -</span><span style="color: #0000ff;">2</span><span style="color: #000000;">;	</span><span style="font-style: italic;color: #808080;">/* cpudiv deve ser par */</span>
+<span style="font-weight: bold;color: #000000;">if</span><span style="color: #000000;">(PLLSTAT &amp; (</span><span style="color: #0000ff;">1</span><span style="color: #000000;"> &lt;&lt; </span><span style="color: #0000ff;">25</span><span style="color: #000000;">)){	</span><span style="font-style: italic;color: #808080;">/* Se PLL nao estava configurado */</span>
+<span style="color: #000000;">	PLLCON = </span><span style="color: #0000ff;">1</span><span style="color: #000000;">;	</span><span style="font-style: italic;color: #808080;">/* Habilita PLL, desconectado */</span>
+<span style="color: #000000;">	PLLFEED=</span><span style="color: #008080;">0xAA</span><span style="color: #000000;">;PLLFEED=</span><span style="color: #008080;">0x55</span><span style="color: #000000;">;</span>
+<span style="color: #000000;">	}</span>
+<span style="color: #000000;">PLLCON=</span><span style="color: #0000ff;">0</span><span style="color: #000000;">;	</span><span style="font-style: italic;color: #808080;">/* Desconecta e desabilita o PLL */</span>
+<span style="color: #000000;">PLLFEED=</span><span style="color: #008080;">0xAA</span><span style="color: #000000;">;PLLFEED=</span><span style="color: #008080;">0x55</span><span style="color: #000000;">;</span>
+<span style="font-style: italic;color: #808080;">/* Depois deste comando deve-se usar FIO1PIN para acessar a porta P1 */</span>
+<span style="color: #000000;">SCS = </span><span style="color: #008080;">0x21</span><span style="color: #000000;">;	</span><span style="font-style: italic;color: #808080;">/* Liga o oscilador externo (12MHz) e o GPIO */</span>
+<span style="font-weight: bold;color: #000000;">while</span><span style="color: #000000;">( !(SCS &amp; </span><span style="color: #008080;">0x40</span><span style="color: #000000;">) );	</span><span style="font-style: italic;color: #808080;">/* Espera estabilizar o oscilador */</span>
+<span style="color: #000000;">CLKSRCSEL = </span><span style="color: #008080;">0x1</span><span style="color: #000000;">;	</span><span style="font-style: italic;color: #808080;">/* Usa o 12MHz como oscilador principal */</span>
+<span style="color: #000000;">PLLCFG = (pllmulti/</span><span style="color: #0000ff;">2</span><span style="color: #000000;"> - </span><span style="color: #0000ff;">1</span><span style="color: #000000;">);</span>
+<span style="color: #000000;">PLLFEED=</span><span style="color: #008080;">0xAA</span><span style="color: #000000;">;PLLFEED=</span><span style="color: #008080;">0x55</span><span style="color: #000000;">;</span>
+<span style="color: #000000;">CCLKCFG=</span><span style="color: #0000ff;">0</span><span style="color: #000000;">;	</span><span style="font-style: italic;color: #808080;">/* Divisor do clock da CPU = 1 */</span>
+<span style="color: #000000;">PLLCON=</span><span style="color: #0000ff;">1</span><span style="color: #000000;">;	</span><span style="font-style: italic;color: #808080;">/* Habilita o PLL	*/</span>
+<span style="color: #000000;">PLLFEED=</span><span style="color: #008080;">0xAA</span><span style="color: #000000;">;PLLFEED=</span><span style="color: #008080;">0x55</span><span style="color: #000000;">;</span>
+<span style="color: #000000;">k=</span><span style="color: #0000ff;">80000</span><span style="color: #000000;">;	</span><span style="font-style: italic;color: #808080;">/* No maximo 80000 voltas esperando o PLL lock */</span>
+<span style="font-weight: bold;color: #000000;">while</span><span style="color: #000000;">((!(PLLSTAT &amp; (</span><span style="color: #0000ff;">1</span><span style="color: #000000;">&lt;&lt;</span><span style="color: #0000ff;">26</span><span style="color: #000000;">))) &amp;&amp; k) k--;	</span><span style="font-style: italic;color: #808080;">/* espera PLL Lock */</span>
+<span style="font-style: italic;color: #808080;">/* Se conseguiu PLL Lock, conecta CPU clock ao PLL */</span>
+<span style="color: #000000;">CCLKCFG=cpudiv-</span><span style="color: #0000ff;">1</span><span style="color: #000000;">;	</span><span style="font-style: italic;color: #808080;">/* Divisor por cpudiv na CPU */</span>
+<span style="font-weight: bold;color: #000000;">if</span><span style="color: #000000;">(k)	{</span>
+<span style="color: #000000;">	cpuclock= pllmulti*CRYSTALFREQ/cpudiv;</span>
+<span style="color: #000000;">	PLLCON=</span><span style="color: #0000ff;">3</span><span style="color: #000000;">;	</span><span style="font-style: italic;color: #808080;">/* Conecta o PLL ao clock da CPU */</span>
+<span style="color: #000000;">	}</span>
+<span style="font-weight: bold;color: #000000;">else</span><span style="color: #000000;">	cpuclock=CRYSTALFREQ/cpudiv;</span>
+<span style="color: #000000;">PLLFEED=</span><span style="color: #008080;">0xAA</span><span style="color: #000000;">;PLLFEED=</span><span style="color: #008080;">0x55</span><span style="color: #000000;">;</span>
+<span style="font-style: italic;color: #808080;">/* Usa divisor por 1 em todos os perifericos*/</span>
+<span style="color: #000000;">PCLKSEL0 = </span><span style="color: #008080;">0x55555555</span><span style="color: #000000;">;</span>
+<span style="color: #000000;">PCLKSEL1 = </span><span style="color: #008080;">0x55555555</span><span style="color: #000000;">;</span>
+<span style="font-style: italic;color: #808080;">/* Configura a memoria (MAM) */</span>
+<span style="color: #000000;">MAMCR=</span><span style="color: #008080;">0x0</span><span style="color: #000000;">;</span>
+<span style="color: #000000;">MAMTIM=</span><span style="color: #008080;">0x3</span><span style="color: #000000;">;</span>
+<span style="color: #000000;">MAMCR=</span><span style="color: #008080;">0x2</span><span style="color: #000000;">;</span>
+<span style="font-weight: bold;color: #000000;">return</span><span style="color: #000000;"> cpuclock;</span>
+<span style="color: #000000;">}</span>
+</pre>
+
+<hr>
+<table width="100%" border=1>
+<tr><td class="nav" width="33%"><a href="lpc-05.html">Anterior</a></td>
+    <td class="nav" width="33%"><a href="lpc-index.html">Indice</a></td>
+    <td class="nav" width="33%"><a href="lpc-07.html">Pr&oacute;ximo</a></td></tr>
+</table>
+<p>
+</body>
+</html>

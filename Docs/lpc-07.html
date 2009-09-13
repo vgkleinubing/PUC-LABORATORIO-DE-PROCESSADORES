@@ -1,0 +1,329 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.0 Transitional//EN">
+<html><head>
+   <meta http-equiv="Content-Type" content="text/html; charset=ISO-8859-1">
+   <title>Lab. Processadores: Programa&ccedil;&atilde;o do LPC2378 usando o gcc</title>
+   <link rel="stylesheet" href="lpc-gcc.css" type="text/css">
+</head>
+<body>
+<center>
+<table cellpadding=2 width="100%">
+<tr><td width=61 align=center>
+<img src="../../fengpuc.png" alt="fenglogo" width=61 height=78></td>
+<td bgcolor="#BFCFDF">
+<center>
+<font face="Arial,Helvetica">
+Laborat&oacute;rio de Processadores
+<br>
+Programa&ccedil;&atilde;o do LPC2378 usando o arm-elf-gcc<br>
+Parte 7: Interrup&ccedil;&otilde;es
+</font>
+</center></td>
+<td width=61 align=center>
+<img src="../../puclogo.png" alt="puclogo" width=61 height=78></td></tr>
+</table>
+</center>
+<table width="100%" border=1>
+<tr><td class="nav" width="33%"><a href="lpc-06.html">Anterior</a></td>
+    <td class="nav" width="33%"><a href="lpc-index.html">Indice</a></td>
+    <td class="nav" width="33%"><a href="lpc-08.html">Pr&oacute;ximo</a></td></tr>
+</table>
+<p>Neste exemplo vamos fazer o programa 
+<a href="a07_T0_FIQ/">a07_T0_FIQ</a> para configurar o Kit 
+de modo a usar a interrup&ccedil;&atilde;o tipo FIQ para fazer
+ piscar o LED de forma cadenciada usando o timer T0.
+Para configurar e testar o programa fazemos como de costume:
+<p><b>Configurar para gravar na mem&oacute;ria Flash</b>
+<p>Colocar o kit em modo de programa&ccedil;&atilde;o
+<p>Compilar e gravar a flash com o comando:
+<pre class="code">
+make isp
+</pre>
+Testar chamando o terminal <tt class="code">ltser</tt> e iniciar a execu&ccedil;&atilde;o apertando
+no bot&atilde;o de RESET.
+<p><b>Configurar para gravar na mem&oacute;ria RAM</b>
+<p>Pode-se executar o programa na RAM. At&eacute; os vertores de interrup&ccedil;&atilde;o
+podem rer remapeados para funcionar a partir da RAM a partir do endere&ccedil;o 0x40000000.
+Um registrador de configura&ccedil;&atilde;o do LPC2378 chamado MEMMAP permite remapear
+os vetores de interrup&ccedil;&atilde;o para a RAM.
+<p>O programa <a href="mon23/">mon23</a> inclui um carregador de arquivos *.hex que pode
+colocar o programa na RAM usando o terminal ltser. 
+Isto &eacute; feito automaticamente usando a diretiva <tt class="code">make tser</tt>
+deste projeto. Antes de executar <tt class="code">make tser</tt> &eacute; necess&aacute;rio
+que o monitor mon23 esteja gravado na Flash e sendo executado. 
+Ent&atilde;o basta fazer
+<pre class="code">make tser
+</pre>
+O programa ser&aacute; compilado com a configura&ccedil;&atilde;o para executar na RAM e
+carregado na RAM usando o terminal <tt class="code">ltser</tt>. Para executa-lo
+usa-se o comando <b>P</b> do monitor mon23.
+
+<h3><a name="timer"></a>An&aacute;lise do programa: Configura&ccedil;&atilde;o do Timer</h3>
+Agora veremos como este programa foi feito, estudando os recursos do LPC2378 que foram usados.
+Neste programa o timer T0 foi configurado para gerar interrup&ccedil;&otilde;es tipo FIQ.
+A rotina de atendimento da interrup&ccedil;&atilde;o faz acender ou apagar um LED.
+<p>Os registradores usados na configura&ccedil;&atilde;o do timer s&atilde;o os seguintes:
+<table border=0 cellpadding=8>
+<tr><td width=100 class="code">T0CR<br>0xE0004004</td>
+	<td>Timer Control Register. Habilita ou Inicializa o Timer<br>
+	bit 0: Habilita o Timer.<br>
+	bit 1: Inicializa o timer com zero.
+	</td></tr>
+<tr><td width=100 class="code">T0TC<br>0xE0004008</td>
+	<td>
+	T0 Timer Count. Neste registrador est&aacute; o valor da contagem do timer.
+	</td></tr>
+<tr><td width=100 class="code">T0PR<br>0xE000400C</td>
+	<td>
+	T0 Prescale Register: Configura o divisor da
+	frequ&ecirc;ncia de incremento do timer. O registrador T0PC &eacute; incrementado
+	at&eacute; ficar igual ao T0PR. Neste momento a contagem T0TC &eacute; incrementada e
+	T0PC &eacute; zerado. Portanto configura-se este registrador com o divisor de
+	freq&ecirc;ncia menos um.
+	</td></tr>
+<tr><td width=100 class="code">T0MCR<br>0xE0004014</td>
+	<td>
+	T0 Match Control Register. Registrador configura&ccedil;&atilde;o dos registradores de compara&ccedil;&atilde;o 
+	<i>Match Registers</i>. Os bits deste registrador selecionam o que fazer quando o valor da contagem se iguala
+	ao <i>Match Register</i> correspondente. 1 (um) habilita. 0 (zero) desabilita.<br>
+	<table border=1>
+		<tr><th>Bit</th><th>M&aacute;scara</th><th>S&iacute;mbolo</th><th>A&ccedil;&atilde;o</th></tr>
+		<tr><td class="code">0</td><td class="code">0x0001</td><td class="code">MR0I</td><td>
+			Gera interrup&ccedil;&atilde;o quando <tt class="code">T0TC</tt>
+			atinge <tt class="code">T0MR0</tt></td></tr>
+		<tr><td class="code">1</td><td class="code">0x0002</td><td class="code">MR0R</td><td>
+			Reinicializa <tt class="code">T0TC</tt> quando  <tt class="code">T0TC</tt> 
+			atinge <tt class="code">T0MR0</tt></td></tr>
+		<tr><td class="code">2</td><td class="code">0x0004</td><td class="code">MR0S</td><td>
+			Para <tt class="code">T0TC</tt> quando  <tt class="code">T0TC</tt> 
+			atinge <tt class="code">T0MR0</tt></td></tr>
+		<tr><td class="code">3</td><td class="code">0x0008</td><td class="code">MR1I</td><td>
+			Gera interrup&ccedil;&atilde;o quando <tt class="code">T0TC</tt>
+			atinge <tt class="code">T0MR1</tt></td></tr>
+		<tr><td class="code">4</td><td class="code">0x0010</td><td class="code">MR1R</td><td>
+			Reinicializa <tt class="code">T0TC</tt> quando  <tt class="code">T0TC</tt> 
+			atinge <tt class="code">T0MR1</tt></td></tr>
+		<tr><td class="code">5</td><td class="code">0x0020</td><td class="code">MR1S</td><td>
+			Para <tt class="code">T0TC</tt> quando  <tt class="code">T0TC</tt> 
+			atinge <tt class="code">T0MR1</tt></td></tr>
+		<tr><td class="code">6</td><td class="code">0x0040</td><td class="code">MR2I</td><td>
+			Gera interrup&ccedil;&atilde;o quando <tt class="code">T0TC</tt>
+			atinge <tt class="code">T0MR2</tt></td></tr>
+		<tr><td class="code">7</td><td class="code">0x0080</td><td class="code">MR2R</td><td>
+			Reinicializa <tt class="code">T0TC</tt> quando  <tt class="code">T0TC</tt> 
+			atinge <tt class="code">T0MR2</tt></td></tr>
+		<tr><td class="code">8</td><td class="code">0x0100</td><td class="code">MR2S</td><td>
+			Para <tt class="code">T0TC</tt> quando  <tt class="code">T0TC</tt> 
+			atinge <tt class="code">T0MR2</tt></td></tr>
+		<tr><td class="code">9</td><td class="code">0x0200</td><td class="code">MR3I</td><td>
+			Gera interrup&ccedil;&atilde;o quando <tt class="code">T0TC</tt>
+			atinge <tt class="code">T0MR3</tt></td></tr>
+		<tr><td class="code">10</td><td class="code">0x0400</td><td class="code">MR3R</td><td>
+			Reinicializa <tt class="code">T0TC</tt> quando  <tt class="code">T0TC</tt> 
+			atinge <tt class="code">T0MR3</tt></td></tr>
+		<tr><td class="code">11</td><td class="code">0x0800</td><td class="code">MR3S</td><td>
+			Para <tt class="code">T0TC</tt> quando  <tt class="code">T0TC</tt> 
+			atinge <tt class="code">T0MR3</tt></td></tr>
+
+	</table>
+	</td></tr>
+</table>
+<p>Temos tamb&eacute;m os Match Registers <tt class="code">T0MR0, T0MR1, T0MR2 e T0MR3</tt> que tem 
+os valores de contagem em que devem acontecer os eventos.
+<p>No programa principal do projeto <a href="a07_T0_FIQ/">a07_T0_FIQ</a> temos o seguinte procedimento para
+configurar o timer para gerar interrup&ccedil;&otilde;es:
+<pre class="code">
+T0TCR = 2; T0TCR=0;	/* Limpa e habilita T0 */
+/* Preescalonador do T0 para incrementar 32 vezes por segundo */
+T0PR = (CRYSTALFREQ / 32);
+T0TCR=1;
+/* Configura T0 para gerar int na contagem 8 e 24 e resetar em 32 */
+T0MCR=0x89;	/* Interrompe em T0MR0 e T0MR1; Reset em T0MR2 */
+T0IR=3;		/* Interrompe quando encontrar T0MR0, T0MR1 */
+/* Deve colocar 1 a menos nos T0MR porque o evento acontece no fim do ciclo */
+T0MR0 = 7;	/* Interrompe quando T0TC==8	*/
+T0MR1 = 23;	/* Interrompe quando T0TC==24	*/
+T0MR2 = 31;	/* Reinicia quando T0TC==32	*/
+</pre>
+<h3><a name="fiq"></a>Sistema de Interrup&ccedil;&otilde;es - FIQ</h3>
+Os processadores da família lpc23xx tem tres tipos distintos de interrup&ccedil;&atilde;o:
+A interrup&ccedil;&atilde;o tipo <b>FIQ</b> (Fast Interrupt reQuest) &eacute; um tipo de interrup&ccedil;&atilde;o
+de alta prioridade, geralmente usada para apenas uma fonte de interrup&ccedil;&atilde;o.
+A interrup&ccedil;&atilde;o tipo <b>IRQ</b> (Interrupt ReQuest) pode ser vetorada ou n&atilde;o vetorada. 
+A <b>IRQ</b> n&atilde;o vetorada pode ser usada de forma muito semelhante &agrave; <b>FIQ</b>, por&eacute;m com menor prioridade.
+A <b>IRQ</b> vetorada permite que v&aacute;rias fontes de interrup&ccedil;&atilde;o sejam automaticamente vetoradas para
+as respectivas rotinas de atendimento.
+<p>Neste exemplo vamos demonstrar a configura&ccedil;&atilde;o da interrup&ccedil;&atilde;o tipo FIQ.
+<p>O gcc usa uma exten&ccedil;&atilde;o especial de sintaxe para declarar rotinas de atendimento de
+interrup&ccedil;&atilde;o: [no arquivo <a href="a07_T0_FIQ/vic_cpsr.h">vic_cpsr.h</a>]
+<pre class="code">
+/* Declaracoes especiais para rotinas de atendimento a interrupcoes*/
+void SWI_Routine(void) __attribute__ ((interrupt("SWI")));
+void FIQ_Routine(void) __attribute__ ((interrupt("FIQ")));
+</pre>
+Estas declara&ccedil;&otilde;es encontram-se no arquivo de cabe&ccedil;alho <tt class="code">vic_cpsr.h</tt>.
+Neste arquivo tamb&eacute;m tem rotinas que geram instru&ccedil;&otilde;es em linha
+ para habilitar as interrup&ccedil;&otilde;es no registrador de status CPSR:
+<pre class="code">
+/* Macros para habilitar/desabilitar IRQ/FIQ no CPSR */
+#define habilitaFIQ() asm volatile(\
+	"mrs r3, cpsr\n" \
+	"bic r3, r3, # 0x40\n" \
+	"msr cpsr, r3\n")
+
+#define desabilitaFIQ() asm volatile(\
+	"mrs r3, cpsr\n" \
+	"orr r3, r3, # 0x40\n" \
+	"msr cpsr, r3\n")
+</pre>
+Usando estas intru&ccedil;&otilde;es pode-se habilitar as interrup&ccedil;&otilde;es tipo FIQ com o comando:
+<pre class="code">
+habilitaFIQ();
+</pre>
+<p>Os processadores da fa&iacute;lia LPC23xx tem 32 fontes de interrup&ccedil;&atilde;o,
+classificadas de acordo com a tabela a seguir.
+<table border=0 cellpadding=2>
+<tr><th>bit</th><th>M&aacute;scara</th><th>M&oacute;dulo</th><th>Fonte de interrup&ccedil;&atilde;o</th></tr>
+<tr><td class="code">0</td><td class="code">0x00000001</td><td class="code">WDT</td>
+	<td>Watchdog Interrupt</td></tr>
+<tr><td class="code">1</td><td class="code">0x00000004</td><td class="code">ARM-core</td>
+	<td>ICE DbgRX</td></tr>
+<tr><td class="code">2</td><td class="code">0x00000008</td><td class="code">ARM-core</td>
+	<td>ICE DbgTX</td></tr>
+<tr><td class="code">4</td><td class="code">0x00000010</td><td class="code">TIMER0</td>
+	<td>Contagem atinge MR0, MR1</td></tr>
+<tr><td class="code">5</td><td class="code">0x00000020</td><td class="code">TIMER1</td>
+	<td>Contagem atinge MR0, MR1</td></tr>
+<tr><td class="code">6</td><td class="code">0x00000040</td><td class="code">UART0</td>
+	<td>Evento na porta serial UART0</td></tr>
+<tr><td class="code">7</td><td class="code">0x00000080</td><td class="code">UART1</td>
+	<td>Evento na porta serial UART1</td></tr>
+<tr><td class="code">8</td><td class="code">0x00000100</td><td class="code">PWM1</td>
+	<td>PWM1 Match ou Capture</td></tr>
+<tr><td class="code">9</td><td class="code">0x00000200</td><td class="code">I<sup>2</sup>C0</td>
+	<td>Mudan&ccedil;a de estado no I<sup>2</sup>C0</td></tr>
+<tr><td class="code">10</td><td class="code">0x00000400</td><td class="code">SPI0</td>
+	<td>Mudan&ccedil;a de estado no SSP0</td></tr>
+<tr><td class="code">11</td><td class="code">0x00000800</td><td class="code">SPI1</td>
+	<td>Mudan&ccedil;a de estado no SSP1</td></tr>
+<tr><td class="code">12</td><td class="code">0x00001000</td><td class="code">PLL</td>
+	<td>PLL Lock (Travamento do PLL)</td></tr>
+<tr><td class="code">13</td><td class="code">0x00002000</td><td class="code">RTC</td>
+	<td>Rel&oacute;gio/ Despertador</td></tr>
+<tr><td class="code">14</td><td class="code">0x00004000</td><td class="code">EINT0</td>
+	<td>Interrup&ccedil;&atilde;o externa 0</td></tr>
+<tr><td class="code">15</td><td class="code">0x00008000</td><td class="code">EINT1</td>
+	<td>Interrup&ccedil;&atilde;o externa 1</td></tr>
+<tr><td class="code">16</td><td class="code">0x00010000</td><td class="code">EINT2</td>
+	<td>Interrup&ccedil;&atilde;o externa 2</td></tr>
+<tr><td class="code">17</td><td class="code">0x00020000</td><td class="code">EINT3/GPIO</td>
+	<td>Interrup&ccedil;&atilde;o externa 3 e GPIO</td></tr>
+<tr><td class="code">18</td><td class="code">0x00040000</td><td class="code">ADC0</td>
+	<td>Fim de convers&atilde;o do ADC0</td></tr>
+<tr><td class="code">19</td><td class="code">0x00080000</td><td class="code">I<sup>2</sup>C1</td>
+	<td>Mudan&ccedil;a de estado no I<sup>2</sup>C1</td></tr>
+<tr><td class="code">20</td><td class="code">0x00100000</td><td class="code">BOD</td>
+	<td><i>Brown Out Detect</i> - Detector de tens&atilde;o baixa</td></tr>
+<tr><td class="code">21</td><td class="code">0x00200000</td><td class="code">Ethernet</td>
+	<td>Evento na interface ethernet</td></tr>
+<tr><td class="code">22</td><td class="code">0x00400000</td><td class="code">USB</td>
+	<td>Evento na interface USB</td></tr>
+<tr><td class="code">23</td><td class="code">0x00800000</td><td class="code">CAN</td>
+	<td>Evento na interface CAN</td></tr>
+<tr><td class="code">24</td><td class="code">0x01000000</td><td class="code">SD/MMC</td>
+	<td>Evento na interface SD/MMC</td></tr>
+<tr><td class="code">25</td><td class="code">0x02000000</td><td class="code">GPDMA</td>
+	<td>Evento no DMA</td></tr>
+<tr><td class="code">26</td><td class="code">0x04000000</td><td class="code">TIMER2</td>
+	<td>Contagem atinge MR0, MR1</td></tr>
+<tr><td class="code">27</td><td class="code">0x08000000</td><td class="code">TIMER3</td>
+	<td>Contagem atinge MR0, MR1</td></tr>
+<tr><td class="code">28</td><td class="code">0x10000000</td><td class="code">UART2</td>
+	<td>Evento na porta serial UART2</td></tr>
+<tr><td class="code">29</td><td class="code">0x20000000</td><td class="code">UART3</td>
+	<td>Evento na porta serial UART3</td></tr>
+<tr><td class="code">30</td><td class="code">0x40000000</td><td class="code">I<sup>2</sup>C2</td>
+	<td>Mudan&ccedil;a de estado no I<sup>2</sup>C2</td></tr>
+<tr><td class="code">31</td><td class="code">0x80000000</td><td class="code">I<sup>2</sup>S2</td>
+	<td>Mudan&ccedil;a de estado no I<sup>2</sup>S2</td></tr>
+</table>
+<p>Neste programa desejamos habilitar a interrup&ccedil;&atilde;o do timer 0,
+n&uacute;mero 4, com m&aacute;scara 0x00000010. Queremos tamb&eacute;m configurar
+esta interrup&ccedil;&atilde;o como FIQ. Isto &eacute; feito com os seguintes
+comandos.
+<pre class="code">
+VICIntSelect = 0x10;	/* Timer0=bit 4 como FIQ	*/
+VICIntEnable = 0x10;	/* Habilita int do Timer0	*/
+</pre>
+<p>A rotina de atendimento da FIQ acende ou apaga o LED, dependendo de qual T0MR gerou a interrup&ccedil;&atilde;o.
+No final a rotina FIQ deve escrever no T0IR um valor (igual ao que foi lido no T0IR) para indicar que a
+ interrup&ccedil;&atilde;o foi atendida.
+<pre class="code">
+/* A rotina de atendimento da FIQ 
+  Liga o LED quando a contagem atinge MR0
+  Desliga o LED quando a contagem atinge MR1
+*/
+void FIQ_Routine()
+{
+int k;
+k=T0IR;		/* T0IR identifica quem causou a int	*/
+if(k &amp; 1) FIO3CLR = 0x01000000; /* T0MR0: Liga LED 1	*/
+if(k &amp; 2) FIO3SET = 0x01000000; /* T0MR1: Desliga LED 1	*/
+T0IR = k;	/* Deve limpar a INT no T0IR */
+}
+</pre>
+<h3><a name="irq"></a>Interrup&ccedil;&otilde;es vetoradas tipo IRQ</h3>
+<p>No sistema de interrup&ccedil;&atilde;o vetorada, a rotina de atendimento
+recebe o vetor que pode transferir a execu&ccedil;&atilde;o para
+uma rotina espec&iacute;fica para aquele tipo de interrup&ccedil;&atilde;o.
+<p>Isto &eacute; feito por uma instr&ccedil;&atilde;o tipo:
+<pre class="code">
+		ldr	PC, [PC,#-0x0120]	
+</pre>
+<p>O programa exemplo <a href="a07_RTC_IRQ">arm06</a> demonstra como usar 
+uma interrup&ccedil;&atilde;o vetorada no do rel&oacute;gio RTC para escrever
+no display LCD. Neste programa o <a href="a07_RTC_IRQ/main.c">main.c</a>
+&eacute; apenas uma rotina de teste. As rotinas de inerrup&ccedil;&atilde;o
+est&atilde;o no m&oacute;dulo  <a href="a07_RTC_IRQ/lcd.c">lcd.c</a>.
+<p>A habilita&ccedil;&atilde;o &eacute; feita de forma similar &agrave; FIQ, mas pode-se
+ter diferentes rotinas de atendimento de acordo com a fonte de interrup&ccedil;&atilde;o.
+O vetor &acute; configurado usando uma escrita em VICVectAddr4 (Para a IRQ numero 4: Timer 0).
+O seguinte trecho de programa coloca 0 no bit 4 do VICIntSelect para selecionar como IRQ,
+liga o bit 4 do VICIntEnable para habilitar a  interrup&ccedil;&atilde;o no VIC e coloca o
+vetor no VICVectAddr4. Observe que o valor 0x10 &eacute; um n&uacute;mero com apenas o bit 4 ligado.
+<pre class="code">
+CISS = 0x85;	/* Configura o RTC para gerar 64 iterrup&ccedil;&otilde;es por segundo */
+ILR=0;		/* Limpa o identificador de interrup&ccedil;&otilde;es do RTC */
+desabilitaIRQ();	/* Desabilita IRQ no reg CPSR da CPU */
+VICVectAddr13 = (int)IRQ_RTC;	/* Instala o vetor 13: RTC */
+VICIntSelect &amp;= ~0x2000;	/* Seleciona como IRQ */
+VICIntEnable |= 0x2000;		/* Habilita IRQ do RTC */
+habilitaIRQ();
+</pre>
+A rotina de atendimento de interrup&ccedil;&atilde;o tipo IRQ tamb&eacute;m deve ter um
+tipo de declara&ccedil;&atilde;o especial no gcc:
+<pre class="code">
+void IRQ_RTC(void) __attribute__ ((interrupt("IRQ")));
+</pre>
+No final da rotina de atendimento o programa deve escrever 0 no VICVectAddr para
+indicar para o VIC que a interrup&ccedil;&atilde;o foi atendida.
+Tamb&eacute;m &eacute; necess&aacute;rio limpar a interrup&ccedil;&atilde;o 
+no dispositivo que a gerou, o caso o registrador ILR do rel&oacute;gio.
+Isto &eacute; feito lendo o ILR e escrevendo nele o mesmo valor.
+<pre class="code">
+void IRQ_RTC(void)
+{
+short k;
+/* Aqui v&atilde;o as opera&ccedil;&otilde;es de atendimento */
+k=ILR;			/* Le o identificador de IRQ do RTC */
+ILR = k;		/* Limpa a IRQ do RTC	*/
+VICVectAddr = 0;	/* Rearma o VIC		*/
+}
+</pre>
+<hr>
+<table width="100%" border=1>
+<tr><td class="nav" width="33%"><a href="lpc-06.html">Anterior</a></td>
+    <td class="nav" width="33%"><a href="lpc-index.html">Indice</a></td>
+    <td class="nav" width="33%"><a href="lpc-08.html">Pr&oacute;ximo</a></td></tr>
+</table>
+</body>
+</html>

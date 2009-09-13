@@ -1,0 +1,329 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.0 Transitional//EN">
+<html><head>
+   <meta http-equiv="Content-Type" content="text/html; charset=ISO-8859-1">
+   <title>Lab. Processadores: Programa&ccedil;&atilde;o do LPC2378 usando o gcc</title>
+   <link rel="stylesheet" href="lpc-gcc.css" type="text/css" >
+</head>
+<body>
+<center>
+<table cellpadding=2 width="100%">
+<tr><td width=61 align=center><img src="../../fengpuc.png" alt="fenglogo" width=61 height=78></td>
+<td bgcolor="#BFCFDF">
+<center>
+<font face="Arial,Helvetica">
+Laborat&oacute;rio de Processadores
+<br>
+Programa&ccedil;&atilde;o do LPC2378 usando o arm-elf-gcc<br>
+Parte 2: An&aacute;lise dos programas
+</font>
+</center></td>
+<td width=61 align=center><img src="../../puclogo.png" alt="puclogo" width=61 height=78></td></tr>
+</table>
+</center>
+<table width="100%" border=1>
+<tr><td class="nav" width="33%"><a href="lpc-01.html">Anterior</a></td>
+    <td class="nav" width="33%"><a href="lpc-index.html">Indice</a></td>
+    <td class="nav" width="33%"><a href="lpc-03.html">Pr&oacute;ximo</a></td></tr>
+</table>
+<p>Agora vamos ver mais atentamente os arquivos que formam o projeto.
+Cada projeto de software para ARM deve ter o seu pr&oacute;prio diret&oacute;rio. 
+Neste caso temos o diret&oacute;rio <tt class="code">arm02</tt> que foi criado quando expandimos o
+arquivo <a href="a02_pisca_led.tgz">a02_pisca_led.tgz</a>. Vimos que neste diret&oacute;rio temos
+os seguintes arquivos:
+<dl>
+<dt><tt class="code"><a href="#makefile">Makefile</a></tt>
+<dd>Arquivo de configura&ccedil;&atilde;o do programa <tt class="code">make</tt>, descrevendo os procedimentos
+necess&aacute;rios para automatizar a compila&ccedil;&atilde;o do projeto.</dd>
+<dt><tt class="code"><a href="arm02/crt.S">crt.S</a></tt>
+<dd>Procedimento de inicializa&ccedil;&atilde;o (<i>startup</i>) escrito em linguagem assembly do ARM7.
+Este procedimento contem o ponto de entrada principal do programa e as entradas das interrup&ccedil;&otilde;es.
+Ele tambem incializa a mem&oacute;ria e o sistema de clock
+e chama a rotina <tt class="code">main()</tt> da parte escrita em linguagem C.
+</dd>
+<dt><tt class="code"><a href="#flash-ld">lpc2378_flash.ld</a></tt>
+<dd>Script de configura&ccedil;&atilde;o de linker/loader. Este arquivo descreve como o 
+<tt class="code">arm-elf-ld</tt> deve alocar mem&oacute;ria no LPC2378 para os segmentos do programa.
+</dd>
+<dt><tt class="code"><a href="lpc23xx.h">lpc23xx.h</a></tt>
+<dd>Arquivo de cabe&ccedil;alho para <tt class="code">#include</tt> contendo a descri&ccedil;&atilde;o dos registradores, 
+e portas de I/O dos perif&eacute;ricos do LPC2378. Nos programas atuais este arquivo
+est&aacute; junto com o compilador no subdiret&oacute;rio<br>
+<tt class="code">arch/nxp</tt>
+</dd>
+<dt><tt class="code"><a href="#main">main.c</a></tt>
+<dd>Programa principal. Neste exemplo procurou se fazer a coisa mais simples poss&iacute;vel 
+que tenha resultados pr&aacute;ticos: Fazer piscar um LED.
+</dd>
+</dl>
+A seguir vai uma explica&ccedil;&atilde;o sobre cada um destes arquivos.
+<a name="makefile"></a>
+<h3><a href="a02_pisca_led/Makefile">Makefile</a></h3>
+<p>Para executar automaticamente todas as etapas da compila&ccedil;&atilde;o do projeto abre-se um
+<i>shell</i>, entra-se o diret&oacute;rio do projeto e usa-se o comando:<br>
+<tt class="code">make</tt><br>
+A forma geral do <tt class="code">make</tt> &eacute;:<br>
+<tt class="code">make <i>alvo</i></tt><br>
+Onde o <tt class="code"><i>alvo</i></tt> &eacute; o nome de um arquivo ou procedimento definido como alvo
+no <tt class="code">Makefile</tt>. O comando <tt class="code">make</tt> sem par&acirc;metros
+equivale ao alvo default chamado <tt class="code">all</tt>. 
+Neste projeto os sequintes alvos podem ser &uacute;teis:
+<table border=0 cellpadding=8>
+<tr><td width=200 class="code">make all</td>
+	<td>Equivale a simplesmente <tt class="code">make</tt>. 
+	Compila todos os m&oacute;dulos gerando o arquivo <tt class="code">arm02.hex</tt>. </td></tr>
+<tr><td width=200 class="code">make arm02.hex</td>
+	<td>Compila todos os m&oacute;dulos gerando o arquivo <tt class="code">arm02.hex</tt>.</td></tr>
+<tr><td width=200 class="code">make isp</td>
+	<td>Compila tudo e chama o <tt class="code">lpc21isp</tt> 
+	para gravar o programa na Flash do microcontrolador</td></tr>
+<tr><td width=200 class="code">make tser</td>
+	<td>Compila uma vers&atilde;o para ser executada na RAM e chama o terminal <tt class="code">ltser</tt> que envia o programa para a RAM.
+	O monitor <tt class="code">mon23</tt> deve estar instalado na Flash e sendo executado.
+	Para executar o programa feito com o <tt class="code">make tser</tt> usa-se o comando "P" do monitor.</td></tr>
+<tr><td width=200 class="code">make clean</td>
+	<td>Apaga os arquivos intermedi&aacute;rios gerados na compila&ccedil;&atilde;o.</td></tr>
+</table>
+
+<p>O <tt class="code">Makefile</tt> &eacute; organizado como um conjunto de alvos (<i>targets</i>) que s&atilde;o receitas de
+como obter determinado tipo de arquivo. Antes dos <i>targets</i> temos as <i>macros</i> 
+ou defini&ccedil;&otilde;es de vari&aacute;veis de ambiente, que s&atilde;o
+uma forma de dar nomes para <i>strings</i> usadas na configura&ccedil;&atilde;o dos <i>targets</i>.
+Linhas que come&ccedil;am com # s&atilde;o coment&aacute;rios;
+<p>
+Perto do in&iacute;cio do <tt class="code">Makefile</tt> temos uma defini&ccedil;&atilde;o de macro na linha:
+<pre class=code>SERIALDEV = /dev/ttyS0</pre>
+Isto significa que doravante <tt class="code">$(SERIALDEV)</tt> ser&aacute; substitu&iacute;do por <tt class="code">/dev/ttyS0</tt>.
+Neste caso espec&iacute;fico estamos definindo o nome do dispositivo a ser usado como interface serial
+para programar o Microcontrolador. Observe que este nome &eacute; t&iacute;pico da primeira porta serial no Linux.
+Para outras situa&ccedil;&otilde;es devemos alterar esta linha de acordo. Por exemplo:
+<table border=0>
+<tr><td width=300 class="code">SERIALDEV = com1</td>
+	<td> Porta serial 1 no Windows</td></tr>
+<tr><td width=300 class="code">SERIALDEV = com2</td>
+	<td> Porta serial 2 no Windows</td></tr>
+<tr><td width=300 class="code">SERIALDEV = /dev/ttyUSB0</td>
+	<td>Conversor USB-RS232 no Linux</td></tr>
+</table>
+Nesta parte inicial tamb&eacute;m temos outras macros podem requerer modifica&ccedil;&otilde;es para 
+usar o <tt class="code">Makefile</tt> em outros contextos:
+<table border=0>
+<tr><td width=300 class="code">CLOCKFREQ = 12000</td>
+	<td>Frequ&ecirc;ncia em kHz do clock principal</td></tr>
+<tr><td width=300 class="code">TARGET = arm02</td>
+	<td>Nome do programa a ser gerado na compila&ccedil;&atilde;o</td></tr>
+<tr><td width=300 class="code">MODULOS = main.o crt.o</td>
+	<td>Lista dos m&oacute;dulos (arquivos fonte) que comp&otilde;e o projeto</td></tr>
+<tr><td width=300 class="code">HEADERS = lpc23xx.h</td>
+	<td>Lista dos arquivos de cabe&ccedil;alho para #includes</td></tr>
+<tr><td width=300 class="code">BAUDRATE = 19200</td>
+	<td>Velocidade da porta serial.</td></tr>
+</table>
+<p>A parte final do <tt class="code">Makefile</tt> define os comandos para obter os targets.
+A sintaxe &eacute; algo assim:
+<pre class="code">
+<i>nome_do_alvo</i>: <i>dependencias</i>
+--tab--><i>comando</i>
+</pre>
+O <tt class="code"><i>nome_do_alvo</i></tt> especifica o arquivo a ser gerado. 
+As <tt class="code"><i>dependencias</i></tt> s&atilde;o os arquivos necess&aacute;rios como pr&eacute; requisitos. 
+Se as depend&ecirc;ncias n&atilde;o forem satisfeitas, o <tt class="code">make</tt> ir&aacute; procurar resolve-las
+executando outros alvos. Antes do comando deve haver um caractere de tabula&ccedil;&atilde;o. 
+Observe que, para editar o Makefile, n&atilde;o se deve usar editores de texto que substituem tabula&ccedil;&atilde;o por espa&ccedil;os (como, por exemplo, o notepad do Windows).
+<p>O <tt class="code">Makefile</tt> tamb&eacute;m pode ter alvos gen&eacute;ricos, convertendo um tipo de arquivo
+em outro. Por exemplo, o seguinte comando compila programas <tt class="code">*.c</tt> 
+em linguagem C, gerando o arquivo objeto <tt class="code">*.o</tt> corresponednte.
+<pre class="code">
+#Compila os modulos em linguagem C
+%.o: %.c
+	$(CC) -c $(CFLAGS) -o $@ $&lt;
+</pre>
+Esta diretiva &eacute; usada para compilar o programa principal
+ <tt class="code">main.c</tt>,
+gerando o arquivo objeto <tt class="code">main.o</tt>.<br> A macro <tt class="code">$(CC)</tt> &eacute;
+expandida como <tt class="code">arm-elf-gcc</tt>; a macro <tt class="code">$(CFLAGS)</tt> &eacute;
+substituida por<br><tt class="code">-Wall -O2 -mcpu=arm7tdmi-s</tt>.<br>
+ O nome especial <tt class="code">$&lt;</tt>
+&eacute; substitu&iacute;do pelo nome do arquivo de entrada <tt class="code">main.c</tt> e a palavra especial 
+<tt class="code">$@</tt> &eacute; o nome do arquivo de sa&iacute;da <tt class="code">main.o</tt>. 
+Assim o make vai gerar a seguinte linha de comando:
+<pre class="code">
+arm-elf-gcc -c -Wall -O2 -mcpu=arm7tdmi-s -o main.o main.c
+</pre>
+<a name="crts"></a>
+<h3><a href="arm02/crt.S">crt.S</a></h3>
+O arquivo crt.S &eacute; o programa de partida, em linguagem assembly, que cont&eacute;m o ponto de entrada inicial
+ do reset e os pontos de entrada das rotinas de interrup&ccedil;&otilde;es. Este programa inicializa as &aacute;reas de
+mem&oacute;ria e de pilha e ent&atilde;o chama a rotina <tt class=code>main()</tt> definida na parte em linguagem C.
+Por enquanto n&atilde;o &eacute; necess&aacute;rio saber detalhes do funcionamento deste m&oacute;dulo.
+<a name="flash-ld"></a>
+<h3><a href="arm02/lpc2378_flash.ld">lpc2378_flash.ld</a></h3>
+Este &eacute; o arquivo de configura&ccedil;&atilde;o do linker ld, que descreve como o linker deve
+alocar mem&oacute;ria para os diversos segmentos do programa.
+<p>O arquivo <a href="arm02/lpc2378_ram.ld">lpc2378_ram.ld</a> &eacute; uma variante deste arquivo
+de configura&ccedil;&atilde;o do linker que serve para gerar um programa para ser executado em memória RAM 
+a pratir do endere&ccedil;o 0x40001000. Para usar este modelo de mem&oacute;ria o kit deve ter o programa 
+<tt class="code">mon23</tt> intalado na flash. Usa-se o comando <br>
+<tt class="code">make tser</tt><br>
+para compilar o programa para rodar na RAM e envia-lo usando o terminal <tt class="code">ltser</tt>.
+Para executar o programa usa-se ent&atilde;o o comando "P" do monitor <tt class="code">mon23</tt>.
+<p>O modelo de mem&oacute;ria mais comunmente usado pelo gcc usa os seguintes segmentos:
+<table border=0 cellpadding=4>
+<tr><td class="code">.text</td><td>Usado para armazenar as instu&ccedil;&otilde;es do programa</td></tr>
+<tr><td class="code">.data</td><td>Usado para armazenar dados vari&aacute;veis inicializados:
+Vari&aacute;veis locais e vari&aacute;veis est&aacute;ticas.</td></tr>
+<tr><td class="code">.bss</td><td>Usado para dados n&atilde;o inicializados</td></tr>
+<tr><td class="code">.stack</td><td>Pilha do microprocessador e vari&aacute;veis locais</td></tr>
+</table>
+Estes segmentos devem ser mapeados para a mem&oacute;ria do LPC2378.
+<p><b>Mapa de mem&oacute;ria do LPC2378</b><p>
+No mapa de mem&oacute;ria alguns endere&ccedil;os s&atilde;o t&iacute;picos, mas podem
+variar de acordo com o tamanho do programa aplicativo.
+<table border=1>
+<tr><td class="flash" rowspan=5><b>Flash</b><br>0x00000000<br>0x0007FFFF<br>(512K)</td>
+	<td class="flash">0x00000000<br>0x0000003F</td>
+	<td class="flash">Vetores de Interrup&ccedil;&atilde;o (64 Bytes)</td></tr>
+<tr><td class="flash">0x00000040 </td>
+	<td class="flash">Rotinas de partida <tt class=code>crt.S</tt></td></tr>
+<tr><td class="flash">0x00000400 </td>
+	<td class="flash">Programas em Linguagem C <tt class=code>main()</tt></td></tr>
+<tr><td class="flash">0x00001000 </td>
+	<td class="flash">Valores iniciais do segmento <tt class=code>.data</tt></td></tr>
+<tr><td class="flash">0x00001100<br>0x0007FFFF</td>
+	<td class="flash">Mem&oacute;ria Flash livre</td></tr>
+<tr><td>0x00080000<br>0x3FFFFFFF</td><td>&nbsp;</td><td>Livre (n&atilde;o definido)</td></tr>
+<tr><td class="ram" rowspan=12><b>RAM</b><br>0x40000000<br>0x40007FFF<br>(32K)</td>
+	<td class="ram">0x40000000<br>0x4000003F</td>
+	<td class="ram">Vetores de interrup&ccedil;&atilde;o<br>(remapeados em RAM)</td></tr>
+<tr>	<td class="ram">0x40000040<br>0x4000011F</td>
+	<td class="ram">Livre</td></tr>
+<tr>	<td class="ram">0x40000120<br>0x400001FF</td>
+	<td class="ram">Usado pelo programador ISP</td></tr>
+<tr>	<td class="ram">0x40000200<br>0x4000020F</td>
+	<td class="ram">.data</td></tr>
+<tr>	<td class="ram">0x40000210<br>0x4000023F</td>
+	<td class="ram">.bss</td></tr>
+<tr>	<td class="ram">0x40000240<br>0x40007EC7</td>
+	<td class="ram">Livre<br>(pilha)</td></tr>
+<tr>	<td class="ram">0x40007ECC</td>
+	<td class="ram">Pilha SVC</td></tr>
+<tr>	<td class="ram">0x40007ED0</td>
+	<td class="ram">Pilha IRQ</td></tr>
+<tr>	<td class="ram">0x40007ED4</td>
+	<td class="ram">Pilha FIQ</td></tr>
+<tr>	<td class="ram">0x40007ED8</td>
+	<td class="ram">Pilha ABT</td></tr>
+<tr>	<td class="ram">0x40007EDC</td>
+	<td class="ram">Pilha UDF</td></tr>
+<tr>	<td class="ram">0x40007EE0</td>
+	<td class="ram">Vari&aacute;veis do ISP</td></tr>
+</table>
+<p>O firmware do gravador da mem&oacute;ria flash (ISP boot loader) usa certas &aacute;reas de mem&oacute;ria.
+Os programas aplicativos devem evitar usar estas &aacute;reas.
+O arquivo <tt class=code><a href="arm02/lpc2378_flash.ld">lpc2378_flash.ld</a></tt>
+&eacute; vinculado ao comando que chama o loader com a op&ccedil;&atilde;o <tt class=code>-T</tt> como
+no comando:
+<pre class=code>
+ld -Tlpc2378_flash.ld -o arm02.elf main.o crt.o
+</pre>
+
+<a name="mainc"></a>
+<h3><a href="a02_pisca_led/main.c">main.c</a></h3>
+O programa <tt class="code">main.c</tt> cont&eacute;m o programa principal da parte em linguagem
+C. Este m&oacute;dulo pode ser modificado para alterar a funcionalidade do programa.
+Como exemplo inicial vamos fazer uma opera&ccedil;&atilde;o muito simples: Fazer piscar um LED.
+Para isto &eacute; necess&aacute;rio aprender como usar as portas de E/S do LPC2378, chamadas de GPIO.
+O acesso aos dispositivos perif&eacute;ricos do LPC2378 &eacute; mapeado em mem&oacute;ria.
+ O arquivo de cabe&ccedil;alho <tt class="code">lpc23xx.h</tt>, inclu&iacute;do no in&iacute;cio
+do <tt class="code">main.c</tt>, cont&eacute;m diretivas para dar nomes aos endere&ccedil;os usados
+para acessar perif&eacute;ricos de I/O. O LPC2378 tem 4 portas de E/S, com 32 bits cada.
+V&aacute;rios pinos tamb&eacute;m tem outras fun&ccedil;&otilde;es, mas todos eles podem ser configurados para
+serem portas gen&eacute;ricas de E/S (GPIO).
+<p>No kit de 2009-1 os LEDs e os bot&otilde;es est&atilde;o conectados &agrave; porta P4:
+<table border=1>
+<tr><th>Pino</th><th>Porta</th><th>Dispositivo</th><th>M&aacute;scara hex</th></tr>
+<tr><td>52</td><td  class="item">P4_0</td><td>LED1</td><td  class="item">0x00000001</td></tr>
+<tr><td>55</td><td  class="item">P4_1</td><td>LED2</td><td  class="item">0x00000002</td></tr>
+<tr><td>58</td><td  class="item">P4_2</td><td>LED3</td><td  class="item">0x00000004</td></tr>
+<tr><td>68</td><td  class="item">P4_3</td><td>LED4</td><td  class="item">0x00000008</td></tr>
+<tr><td>72</td><td  class="item">P4_4</td><td>LED5</td><td  class="item">0x00000010</td></tr>
+<tr><td>74</td><td class="item">P4_5</td><td>LED6</td><td  class="item">0x00000020</td></tr>
+<tr><td>78</td><td class="item">P4_6</td><td>LED7</td><td  class="item">0x00000040</td></tr>
+<tr><td>84</td><td class="item">P4_7</td><td>LED8</td><td  class="item">0x00000080</td></tr>
+<tr><td>86</td><td  class="item">P4_8</td><td>Bot&atilde;o SW0</td><td  class="item">0x00000100</td></tr>
+<tr><td>91</td><td  class="item">P4_9</td><td>Bot&atilde;o SW1</td><td  class="item">0x00000200</td></tr>
+<tr><td>94</td><td  class="item">P4_10</td><td>Bot&atilde;o SW2</td><td  class="item">0x00000400</td></tr>
+<tr><td>101</td><td  class="item">P4_11</td><td>Bot&atilde;o SW3</td><td  class="item">0x00000800</td></tr>
+<tr><td>104</td><td  class="item">P4_12</td><td>Bot&atilde;o SW4</td><td  class="item">0x00001000</td></tr>
+<tr><td>127</td><td  class="item">P4_24</td><td>Sinal E do display LCD</td><td  class="item">0x01000000</td></tr>
+<tr><td>124</td><td  class="item">P4_25</td><td>Sinal RS do display LCD</td><td  class="item">0x02000000</td></tr>
+<tr><td>130</td><td  class="item">P4_30</td><td>PS2_CP Sinal de clock do conector PS/2</td><td  class="item">0x40000000</td></tr>
+<tr><td>134</td><td  class="item">P4_31</td><td>PS2_DATA Sinal de dados do conector PS/2</td><td  class="item">0x80000000</td></tr>
+<tr><td>&nbsp;</td><td class="item">P3_0 a P3_7</td><td>Dados D0 a D7 do LCD</td><td  class="item">0x000000ff</td></tr>
+</table>
+
+<p>Para acessar os pinos como GPIO &eacute; necess&aacute;rio inicialmente fazer algumas
+configura&ccedil;&otilde;es. Um conjunto de registradores chamado PINSEL0 a PINSEL8, 
+com 2 bits para cada pino, seleciona a fun&ccedil;&atilde;o que o pino vai ter.
+O valor inicial destes registradores PINSEL &eacute; geralmente 0, selecionando
+a fun&ccedil;&atilde;o GPIO para os pinos.
+<p>Para configurar os pinos dos LEDs como sa&iacute;das usam-se as configura&ccedil;&otilde;es
+<pre class="code">
+FIO4DIR = (1&lt;&lt;2) | (1&lt;&lt;3); /* LED3 (P4.2) e LED4 (P4.3) como saida */
+</pre>
+O Registrador de 32 bits <tt class=code>FIO4DIR</tt> determina se os bits da porta P3
+s&atilde;o entradas ou sa&iacute;das. Configura-se escrevendo neste registrador um pardr&atilde;o de bits
+onde 0 significa entrada e um significa sa&iacute;da. 
+No caso, o valor <tt class="code">(1&lt;&lt;2)</tt> tem apenas o bit 2 ligado (valor num&eacute;rico = 4).
+<p>Para ligar bits da porta P4 escreve-se no <tt class=code>0</tt> um pad&atilde;o de
+bits onde 1 faz ligar o bit e 0 deixa o bit como est&aacute;. 
+Para desligar um bit escreve-se no <tt class=code>FIO4CLR</tt> um padr&atilde;o onde 1 (um) faz desligar
+o bit e 0 (zero) deixa como est&aacute;. Para controlar o LED4 ligado no P4.3
+usa-se o valor <tt class=code>0x00000008</tt>  ou simplesmente 8.
+<pre class="code">
+FIO3SET= 8;	/* Liga bit 3 da porta P4 (Desliga LED4) */
+FIO3CLR= 8;	/* Desliga bit 3 da porta P4 (liga LED4) */
+</pre>
+<p>As portas P0 e P1 podem ser controladas por dois m&eacute;todos diferentes selecionados
+por um registrador de configura&ccedil;&atilde;o: o <tt class="code">SCS</tt>.
+O LPC2378 inicia em um modo legado, compat&iacute;vel com processadores antigos da fam&iacute;lia 
+LPC20xx, que usa comandos tipo <tt class=code>IOPIN0, IODIR0, IOSET0</tt>
+ e <tt class=code>IOCLR0</tt> para controlar as portas P0 e P1. 
+<p>Ligando bit 0 do registrador <tt class="code">SCS</tt> 
+seleciona-se o m&eacute;todo "<i>fast</i>" para as portas GPIO P0 e P1. 
+Neste modo usam-se comandos tipo 
+<tt class="code">FIO0PIN, FIO0DIR, FIO0SET</tt> ou <tt class="code">FIO0CLR</tt>
+ para controlar os pinos
+das portas P0 ou P1. Nas portas P2, P3 e P4 existe apenas o m&eacute;todo "<i>fast</i>".
+<p>Para ler o estado dos bot&otilde;es ligados na porta P4 usa-se o registrador
+<tt class="code">FIO4PIN</tt>. Este registrador da acesso a todos os 32 bits da porta
+P1. Para testar um bit individual da porta P4 pode-se usar uma opera&ccedil;&atilde;o <i>e</i>
+bit a bit, como no trecho de c&oacute;digo a seguir:
+<pre class="code">
+/* Se sw1 (P4.9) for apertado, liga LED3 */
+if(!(FIO4PIN &amp; (1&lt;&lt;9))) FIO4CLR = 4;
+/* Se sw2 (P4.10) for apertado, desliga LED3 */
+if(!(FIO4PIN &amp; (1&lt;&lt;10))) FIO4SET = 4;
+</pre>
+O loop principal deste programa faz piscar um LED e controla o outro usando
+os bot&otilde;es.
+<p>Depois da rotina <tt class=code>main()</tt> tem a seguinte s&eacute;rie de fun&ccedil;&otilde;es
+que por enquanto n&atilde;o fazem nada:
+<pre class="code">
+/* Estas rotinas s&atilde;o chamados pelo crt.S. 
+Devem existir, mas ainda n&atilde;o est&atilde;o sendo usadas */
+void UNDEF_Routine(){}
+void SWI_Routine(){}
+void timer_routine(){}
+</pre>
+<p>Estas fun&ccedil;&otilde;es s&atilde;o chamadas pela rotina de partida <tt class=code>crt.S</tt>
+quando ocorrem interrup&ccedil;&otilde;es. Veremos para que elas servem quando estudarmos o
+sistema de interrup&ccedil;&otilde;es.
+<hr>
+<table width="100%" border=1>
+<tr><td class="nav"><a href="lpc-01.html">Anterior</a></td>
+    <td class="nav"><a href="lpc-index.html">Indice</a></td>
+    <td class="nav"><a href="lpc-03.html">Pr&oacute;ximo</a></td></tr>
+</table>
+
+</body>
+</html>

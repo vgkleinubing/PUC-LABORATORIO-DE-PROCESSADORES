@@ -1,0 +1,209 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.0 Transitional//EN">
+<html><head>
+   <meta http-equiv="Content-Type" content="text/html; charset=ISO-8859-1">
+   <title>Lab. Processadores: Programa&ccedil;&atilde;o do LPC2378 usando o gcc</title>
+   <link rel="stylesheet" href="lpc-gcc.css" type="text/css">
+</head>
+<body>
+<center>
+<table cellpadding=2 width="100%">
+<tr><td width=61 align=center>
+<img src="../../fengpuc.png" alt="fenglogo" width=61 height=78></td>
+<td bgcolor="#BFCFDF">
+<center>
+<font face="Arial,Helvetica">
+Laborat&oacute;rio de Processadores
+<br>
+Programa&ccedil;&atilde;o do LPC2378 usando o arm-elf-gcc<br>
+Parte 4: Timer e display LCD
+</font>
+</center></td>
+<td width=61 align=center>
+<img src="../../puclogo.png" alt="puclogo" width=61 height=78></td></tr>
+</table>
+</center>
+<table width="100%" border=1>
+<tr><td class="nav" width="33%"><a href="lpc-03.html">Anterior</a></td>
+    <td class="nav" width="33%"><a href="lpc-index.html">Indice</a></td>
+    <td class="nav" width="33%"><a href="lpc-05.html">Pr&oacute;ximo</a></td></tr>
+</table>
+<p>Neste exemplo vamos fazer o programa 
+<a href="arm04.tgz">a04_timer_lcd.tgz</a> para configurar o Kit como um rel&oacute;gio
+que mostra as horas, minutos e segundos no display LCD e na porta serial e
+ pisca os LEDs de forma cadenciada usando o timer T0.
+<a name="timer"></a>
+<h3>Timers</h3>
+Os microcontroladores tipo LPC23xx tem 4 timers (T0, T1, T2 e T3) de 32 bits, 
+que diferem apenas no endere&ccedil;o de acesso. 
+Estes timers tem recursos poderosos, mas na configura&ccedil;&atilde;o b&aacute;sica s&atilde;o f&aacute;ceis de usar. 
+Com eles pode-se medir tempos, gerar interrup&ccedil;&otilde;es cadenciadas ou contar eventos externos.
+<p>Aqui vamos configurar o timer para contar com base no clock externo de 12MHz,
+incrementando a contagem 1000 vezes por segundo. Isto ser&aacute; usado na fun&ccedil;&atilde;o
+<tt class="code">void espera(int t)</tt> para esperar <i>t</i> milisegundos e
+no programa principal para fazer piscar o LED1 ficando apagado durante 600ms e aceso durante 400ms.
+Os registradores usados na configura&ccedil;&atilde;o do timer s&atilde;o os seguintes:
+<table border=0 cellpadding=8>
+<tr><td width=100 class="code">T0TCR<br>0xE0004004</td>
+	<td>Timer Control Register. Habilita ou Inicializa o Timer<br>
+	bit 0: Habilita o Timer.<br>
+	bit 1: Inicializa o timer com zero.
+	</td></tr>
+<tr><td width=100 class="code">T0TC<br>0xE0004008</td>
+	<td>
+	T0 Timer Count. Neste registrador est&aacute; o valor da contagem do timer.
+	</td></tr>
+<tr><td width=100 class="code">T0PR<br>0xE000400C</td>
+	<td>
+	T0 Prescale Register: Configura o divisor da
+	frequ&ecirc;ncia de incremento do timer. O registrador T0PC &eacute; incrementado
+	at&eacute; ficar igual ao T0PR. Neste momento a contagem T0TC &eacute; incrementada e
+	T0PC &eacute; zerado. Portanto configura-se este registrador com o divisor de
+	freq&ecirc;ncia menos um.
+	</td></tr>
+</table>
+<p>Assim a configura&ccedil;&atilde;o do timer para incrementar T0TC 1000 vezes por segundo &eacute;:
+<pre class="code">
+T0TCR = 0;		/* Desabilita T0 */
+T0PR = CRYSTALFREQ/1000 - 1; /* Incrementa o contador T0TC 1000 vezes por segundo */
+T0TCR = 2;	/* Inicializa T0 */
+T0TCR = 1;	/* Habilita T0	*/
+</pre>
+<p>Nesta configura&ccedil;&atilde;o a palavra CRYSTALFREQ &eacute; a frequ&ecirc;ncia em Hertz do clock
+usado no timer. Inicialmente o LPC2378 usa um clock interno de 4MHz com um divisor por 4, resultando
+que CRYSTALFREQ=1000000. Fazendo a configura&ccedil;&atilde;o feita na fun&ccedil;&atilde;o 
+<tt class="code">int PLL_Init(void)</tt>, temos que CRYSTALFREQ=12000000. Esta fun&ccedil;&atilde;o 
+tambem tem outro efito: Antes de usar <tt class="code">int PLL_Init(void)</tt>, o acesso aos pinos GPIO
+das portas P0 e P1 &eacute; feito da forma tradicional, com IOPIN1. Depois deve-se usar as portas com
+acessos tipo FIO1PIN.
+<p>Existem v&aacute;rios outros registradores relacionados com os timers que n&atilde;o vou mencionar porque
+n&atilde;o foram usados neste programa.
+<p>A rotina de espera usa o valor da contagem do timer <tt class="code">T0TC</tt> para
+esperar durante um tempo determinado de milisegundos:
+<pre class="code">
+/* Espera t milisegundos */
+void espera(unsigned int t)
+{
+unsigned int tf;
+tf = T0TC + t;		/* tf = Valor futuro do T0TC */
+while(tf != T0TC);	/* espera ate que x==T0TC */
+}
+</pre>
+<a name="lcd"></a>
+<h3>Display LCD</h3>
+<p>O Kit de Lab. Processadores tem um display LCD de 2 linhas por 16 colunas 
+conectado aos pinos GPIO do LPC2378 de acordo com a tabela a seguir:
+<table border=1>
+<tr><th>Nome do sinal</th><th>Pino do LPC2378</th><th>M&aacute;scara</th><th>Descri&ccedil;&atilde;o</th></tr>
+<tr><td class="code">LCD_E</td><td class="code">P4.24</td><td class="code">0x01000000</td>
+	<td>Habilita&ccedil;&atilde;o do Latch de entrada do LCD.<br> 
+	Normalmente <tt class="code">LCD_E = 0</tt><br>
+	Admite dado quando <tt class="code">LCD_E = 1</tt></td></tr>
+<tr><td class="code">LCD_RS</td><td class="code">P4.25</td><td class="code">0x02000000</td>
+	<td>Seleciona Dado/Comando.<br>
+	<tt class="code">LCD_RS = 0</tt> Comando.<br>
+	<tt class="code">LCD_RS = 1</tt> Escreve caractere.
+</td></tr>
+<tr><td class="code">LCD_D</td><td class="code">P3.0 a P3.7</td><td class="code">0x000000ff</td>
+	<td>Barramento de dados do LCD (8 bits).</td></tr>
+</table>
+<p>Para facilitar o entendimento do programa vamos dar nomes para as m&aacute;scaras de bits:
+<pre class="code">
+#define LCD_E  0x01000000
+#define LCD_RS 0x02000000
+#define LCD_D  0x000000ff
+</pre>
+<p>O display &eacute; controlado escrevendo comandos com RS=0 ou escrevendo
+caracteres ASCII com RS=1. A tabela a seguir apresenta alguns comandos do LCD.
+<table border=1>
+<tr><th>Comando</th><th>Explica&ccedil;&atilde;o</th></tr>
+<tr><td class="item">0x38</td><td>Configura o display para 2 linhas com interface de 8 bits</td></tr>
+<tr><td class="item">0x01</td><td>Limpa o display</td></tr>
+<tr><td class="item">0x0e</td><td>Liga o cursor como um tra&ccedil;o em baixo _ </td></tr>
+<tr><td class="item">0x0f</td><td>Liga o cursor como um bloco s&oacute;lido </td></tr>
+<tr><td class="item">0x0c</td><td>Esconde o cursor</td></tr>
+<tr><td class="item">0x80+x</td><td>Posiciona o cursor na primeira linha, coluna x</td></tr>
+<tr><td class="item">0xc0+x</td><td>Posiciona o cursor na segunda linha, coluna x</td></tr>
+<tr><td class="item">0x10</td><td>Move o cursor 1 charactere para a esquerda</td></tr>
+<tr><td class="item">0x14</td><td>Move o cursor 1 charactere para a direita</td></tr>
+<tr><td class="item">0x18</td><td>Scroll horizontal para a esquerda</td></tr>
+<tr><td class="item">0x1E</td><td>Scroll horizontal para a direita</td></tr>
+</table>
+<p>Conforme foi visto no cap&iacute;tulo 2, podemos controlar os bits
+do display usando os registradores:
+<table border=0 cellpadding=8>
+<tr><td width=100 class="code">FIO3DIR<br>0x3fffc060</td>
+	<td>Especifica a dire&ccedil;&atilde;o dos bits da GPIO P3:<br>
+	0: Entrada<br>1: Saida<br>
+	O processador inicia com todos os bits configurados como entrada.
+</td></tr>
+<tr><td width=100 class="code">FIO3MASK<br>0x3fffc070</td>
+	<td>Habilita a escrita nos pinos da P3:<br>
+	Escrevendo uma m&aacute;scara de bits em FIO3MASK pode-se inibir a escrita 
+	nos bits onde a m&aacute;scara &eacute; 1 (um). O processador inicia com FIO3MASK=0,
+	deixando todos os bits liberados para escrita.
+</td></tr>
+<tr><td width=100 class="code">FIO3PIN<br>0x3fffc074</td>
+	<td>Na escrita escreve um valor nos bits de GPIO<br>
+	Na leitura le o estado dos bits.
+</td></tr>
+<tr><td width=100 class="code">FIO3SET<br>0x3fffc078</td>
+	<td>Liga bits da P3. Os bits onde se escreve 1 s&atilde;o ligados
+	e os bits onde se escreve 0 ficam inalterados.
+</td></tr>
+<tr><td width=100 class="code">FIO3CLR<br>0x3fffc07c</td>
+	<td>Desiga bits da P3. Os bits onde se escreve 1 s&atilde;o desligados
+	e os bits onde se escreve 0 ficam inalterados.
+</td></tr>
+</table>
+<p>O procedimento para escrever um comando no LCD fica assim:
+<pre class="code">
+/* Escreve um comando para o LCD */
+void LCDcomando(int c)
+{
+FIO3PIN0 = c;		/* Escreve dados do LCD nos bits 0 a 7 do FIO3	*/
+FIO4CLR = LCD_RS;	/* Zera o sinal LCD_RS para indicar comando	*/
+FIO4SET = LCD_E;	/* Liga a habilitacao do latch de dados do LCD	*/
+c++; c--;		/* Tempo */
+FIO4CLR = LCD_E;	/* E=0 */
+espera(20);		/* espera 20ms */
+}
+</pre>
+<p>O procedimento para escrever caracteres no display &eacute; similar.
+A &acute;nica diferen&ccedil;a &eacute; que o sinal RS deve ser ligado.
+<pre class="code">
+/* Escreve um caractere no LCD */
+void LCDputchar(int c)
+{
+FIO3PIN0 = c;		/* Escreve dados do LCD nos bits 0 a 7 do FIO3	*/
+FIO4SET = LCD_RS;	/* Liga o sinal LCD_RS para escrever caractere	*/
+FIO4SET = LCD_E;	/* Liga a habilitacao do latch de dados do LCD	*/
+c++; c--;		/* Tempo */
+FIO4CLR = LCD_E;	/* E=0 */
+espera(8);		/* espera 8ms */
+}
+</pre>
+<p>A inicializa&ccedil;&atilde;o do display &eacute; feita configurando as portas
+de GPIO e escrevendo os comandos de configura&ccedil;&atilde;o do LCD:
+<pre class="code">
+/* Inicializa o display LCD */
+void LCDinit(void)
+{
+FIO3DIR |= 0xff;	/* Dados do LCD como saidas */
+FIO4DIR |= (LCD_RS | LCD_E);	/* LCD_RS e LCD_E como sa&iacute;das */
+FIO3CLR = LCD_E;	/* LCD_E deve ficar normalmente em 0 */
+espera(40);
+LCDcomando(0x38);	/* Configura LCD */
+LCDcomando(1);		/* Limpa */
+LCDcomando(0x0c);	/* Cursor oculto */
+}
+</pre>
+
+<hr>
+<table width="100%" border=1>
+<tr><td class="nav" width="33%"><a href="lpc-03.html">Anterior</a></td>
+    <td class="nav" width="33%"><a href="lpc-index.html">Indice</a></td>
+    <td class="nav" width="33%"><a href="lpc-05.html">Pr&oacute;ximo</a></td></tr>
+</table>
+<p>
+</body>
+</html>

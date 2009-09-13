@@ -1,0 +1,307 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.0 Transitional//EN">
+<html><head>
+   <meta http-equiv="Content-Type" content="text/html; charset=ISO-8859-1">
+   <title>Lab. Processadores: Programa&ccedil;&atilde;o do LPC2378 usando o gcc</title>
+   <link rel="stylesheet" href="lpc-gcc.css" type="text/css">
+</head>
+<body>
+<center>
+<table cellpadding=2 width="100%">
+<tr><td width=61 align=center>
+<img src="../../fengpuc.png" alt="fenglogo" width=61 height=78></td>
+<td bgcolor="#BFCFDF">
+<center>
+<font face="Arial,Helvetica">
+Laborat&oacute;rio de Processadores
+<br>
+Programa&ccedil;&atilde;o do LPC2378 usando o arm-elf-gcc<br>
+Parte 8: Programa&ccedil;&atilde;o de mem&oacute;ria Flash:<br>
+IAP: In Application Programming
+</font>
+</center></td>
+<td width=61 align=center>
+<img src="../../puclogo.png" alt="puclogo" width=61 height=78></td></tr>
+</table>
+</center>
+<table width="100%" border=1>
+<tr><td class="nav" width="33%"><a href="lpc-08.html">Anterior</a></td>
+    <td class="nav" width="33%"><a href="lpc-index.html">Indice</a></td>
+    <td class="nav" width="33%"><a href="lpc-10.html">Pr&oacute;ximo</a></td></tr>
+</table>
+<p>O LPC2378 tem uma ROM com um programa tipo <i>boot-loader</i> que serve para
+programar a sua pr&oacute;pria mem&oacute;ria Flash. 
+Um computador pode comunicar-se com o <i>boot-loader</i> atrav&eacute;s 
+da interface serial, fornecedo os comandos e dados do programa a ser gavado 
+na mem&oacute;ria Flash, usando a t&eacute;cnica conhecida pela sigla ISP (<i>In System Programming</i>).
+<p>As fun&ccedil;&otilde;es da ROM do <i>boot-loader</i> podem tamb&eacute;m ser chamadas como
+subrotinas de um programa aplicativo. Chamamos isto de IAP (<i>In Application Programming</i>). 
+<p>As fun&ccedil;&otilde;es do IAP s&atilde;o acess&iacute;veis em um &uacute;nico ponto de entrada
+no endere&ccedil;o <tt class="code">0x7ffffff0</tt>. Recomenda-se usar em vez disto o endere&ccedil;o <tt class="code">0x7ffffff1</tt> para for&ccedil;ar o LPC2378 a executar a fun&ccedil;&atilde;o do IAP em modo THUMB.
+
+Este ponto de entrada recebe como par&acirc;metros, nos registradores R0 e R1, dois apontadores 
+para arrays de inteiros de 32 bits sem sinal.
+Estes arrays tem os par&acirc;metros de entrada e de sa&iacute;da das fun&ccedil;&otilde;es IAP.
+<p>Nos nossos exemplos de programa&ccedil;&atilde;o, o monitor <a href="mon23/">mon23/</a> inclui fun&ccedil;&otilde;es
+para programar a mem&oacute;ria flash incorporada. Estas  fun&ccedil;&otilde;es encontram-se no m&oacute;dulo
+<a href="mon23/iap.c">iap.c</a>.
+<p>Em linguagem C, o acesso &agrave;s fun&ccedil;&otilde;es IAP pode ser feito da seguinte maneira:
+<pre class="code">
+<span style="font-style: italic;color: #808080;">/* Tipo de dados da funcao IAP */</span>
+<span style="font-weight: bold;color: #000000;">typedef</span><span style="color: #000000;"> </span><span style="color: #800000;">void</span><span style="color: #000000;"> (*IAP)(</span><span style="color: #800000;">unsigned</span><span style="color: #000000;"> *rin, </span><span style="color: #800000;">unsigned</span><span style="color: #000000;"> *rout);</span>
+<span style="font-style: italic;color: #808080;">/* Ponto de entrada do IAP */</span>
+<span style="color: #008000;">#define IAP_ENTRY ((IAP)0x7ffffff1)</span>
+<span style="font-style: italic;color: #808080;">/* Array dos parametros de E/S do IAP */</span>
+<span style="color: #800000;">unsigned</span><span style="color: #000000;"> regs[</span><span style="color: #0000ff;">5</span><span style="color: #000000;">];</span>
+
+<span style="font-style: italic;color: #808080;">/* Array com as mensagens de status do IAP */</span>
+<span style="color: #800000;">static</span><span style="color: #000000;"> </span><span style="color: #800000;">const</span><span style="color: #000000;"> </span><span style="color: #800000;">char</span><span style="color: #000000;"> *sstatus[]={</span>
+<span style="color: #dd0000;">"Done"</span><span style="color: #000000;">,</span><span style="color: #dd0000;">"Command error"</span><span style="color: #000000;">, </span><span style="color: #dd0000;">"Invalid src addr"</span><span style="color: #000000;">,</span><span style="color: #dd0000;">"Invalid dest addr"</span><span style="color: #000000;">,</span>
+<span style="color: #dd0000;">"Src not mapped"</span><span style="color: #000000;">,</span><span style="color: #dd0000;">"Dest not mapped"</span><span style="color: #000000;">,</span><span style="color: #dd0000;">"Count_error"</span><span style="color: #000000;">,</span>
+<span style="color: #dd0000;">"Invalid sector"</span><span style="color: #000000;">,</span><span style="color: #dd0000;">"Sector not blank"</span><span style="color: #000000;">,</span><span style="color: #dd0000;">"Sector not prepared"</span><span style="color: #000000;">,</span>
+<span style="color: #dd0000;">"Compare error"</span><span style="color: #000000;">, </span><span style="color: #dd0000;">"Busy"</span><span style="color: #000000;">};</span>
+
+<span style="font-style: italic;color: #808080;">/* Exemplo de uso do IAP */</span>
+<span style="color: #800000;">void</span><span style="color: #000000;"> ReadPartID()</span>
+<span style="color: #000000;">{</span>
+<span style="color: #000000;">UART0puts(</span><span style="color: #dd0000;">"Read part ID: "</span><span style="color: #000000;">);</span>
+<span style="color: #000000;">regs[</span><span style="color: #0000ff;">0</span><span style="color: #000000;">]=</span><span style="color: #0000ff;">54</span><span style="color: #000000;">;		</span><span style="font-style: italic;color: #808080;">/* Comando IAP 54: Read Part ID */</span>
+<span style="color: #000000;">IAP_ENTRY(regs,regs);	</span><span style="font-style: italic;color: #808080;">/* Chama a ROM IAP */</span>
+<span style="color: #000000;">UART0puts(sstatus[regs[</span><span style="color: #0000ff;">0</span><span style="color: #000000;">]]);	</span><span style="font-style: italic;color: #808080;">/* Esceve mensagem de status */</span>
+<span style="color: #000000;">UART0puts(</span><span style="color: #dd0000;">"! ID="</span><span style="color: #000000;">);</span>
+<span style="color: #000000;">escreve_num(regs[</span><span style="color: #0000ff;">1</span><span style="color: #000000;">]);		</span><span style="font-style: italic;color: #808080;">/* Escreve o numero Part ID */</span>
+<span style="color: #000000;">}</span>
+</pre>
+<p>O LPC2378 tem 512kBytes de mem&oacute;ria Flash dividida em 28 setores, com tamanhos
+e edere&ccedil;os iniciais conforme mostra a tabela a seguir:
+<table border=1>
+<tr><th>Setor</th><th>Endere&ccedil;o inicial</th>
+<th>Endere&ccedil;o final</th><th>Tamanho (Bytes)</th></tr>
+<tr><td class="code">0</td>
+	<td class="code">0x00000000</td><td class="code">0x00000FFF</td>
+	<td class="code">4096</td></tr>
+<tr><td class="code">1</td>
+	<td class="code">0x00001000</td><td class="code">0x00001FFF</td>
+	<td class="code">4096</td></tr>
+<tr><td class="code">2</td>
+	<td class="code">0x00002000</td><td class="code">0x00002FFF</td>
+	<td class="code">4096</td></tr>
+<tr><td class="code">3</td>
+	<td class="code">0x00003000</td><td class="code">0x00003FFF</td>
+	<td class="code">4096</td></tr>
+<tr><td class="code">4</td>
+	<td class="code">0x00004000</td><td class="code">0x00004FFF</td>
+	<td class="code">4096</td></tr>
+<tr><td class="code">5</td>
+	<td class="code">0x00005000</td><td class="code">0x00005FFF</td>
+	<td class="code">4096</td></tr>
+<tr><td class="code">6</td>
+	<td class="code">0x00006000</td><td class="code">0x00006FFF</td>
+	<td class="code">4096</td></tr>
+<tr><td class="code">7</td>
+	<td class="code">0x00007000</td><td class="code">0x00007FFF</td>
+	<td class="code">4096</td></tr>
+<tr><td class="code">8</td>
+	<td class="code">0x00008000</td><td class="code">0x0000FFFF</td>
+	<td class="code">32768</td></tr>
+<tr><td class="code">9</td>
+	<td class="code">0x00010000</td><td class="code">0x00017FFF</td>
+	<td class="code">32768</td></tr>
+<tr><td class="code">10</td>
+	<td class="code">0x00018000</td><td class="code">0x0001FFFF</td>
+	<td class="code">32768</td></tr>
+<tr><td class="code">11</td>
+	<td class="code">0x00020000</td><td class="code">0x00027FFF</td>
+	<td class="code">32768</td></tr>
+<tr><td class="code">12</td>
+	<td class="code">0x00028000</td><td class="code">0x0002FFFF</td>
+	<td class="code">32768</td></tr>
+<tr><td class="code">13</td>
+	<td class="code">0x00030000</td><td class="code">0x00037FFF</td>
+	<td class="code">32768</td></tr>
+<tr><td class="code">14</td>
+	<td class="code">0x00038000</td><td class="code">0x0003FFFF</td>
+	<td class="code">32768</td></tr>
+<tr><td class="code">15</td>
+	<td class="code">0x00040000</td><td class="code">0x00047FFF</td>
+	<td class="code">32768</td></tr>
+<tr><td class="code">16</td>
+	<td class="code">0x00048000</td><td class="code">0x0004FFFF</td>
+	<td class="code">32768</td></tr>
+<tr><td class="code">17</td>
+	<td class="code">0x00050000</td><td class="code">0x00057FFF</td>
+	<td class="code">32768</td></tr>
+<tr><td class="code">18</td>
+	<td class="code">0x00058000</td><td class="code">0x0005FFFF</td>
+	<td class="code">32768</td></tr>
+<tr><td class="code">19</td>
+	<td class="code">0x00060000</td><td class="code">0x00067FFF</td>
+	<td class="code">32768</td></tr>
+<tr><td class="code">20</td>
+	<td class="code">0x00068000</td><td class="code">0x0006FFFF</td>
+	<td class="code">32768</td></tr>
+<tr><td class="code">21</td>
+	<td class="code">0x00070000</td><td class="code">0x00077FFF</td>
+	<td class="code">32768</td></tr>
+<tr><td class="code">22</td>
+	<td class="code">0x00078000</td><td class="code">0x00078FFF</td>
+	<td class="code">4096</td></tr>
+<tr><td class="code">23</td>
+	<td class="code">0x00079000</td><td class="code">0x00079FFF</td>
+	<td class="code">4096</td></tr>
+<tr><td class="code">24</td>
+	<td class="code">0x0007A000</td><td class="code">0x0007AFFF</td>
+	<td class="code">4096</td></tr>
+<tr><td class="code">25</td>
+	<td class="code">0x0007B000</td><td class="code">0x0007BFFF</td>
+	<td class="code">4096</td></tr>
+<tr><td class="code">26</td>
+	<td class="code">0x0007C000</td><td class="code">0x0007CFFF</td>
+	<td class="code">4096</td></tr>
+<tr><td class="code">27</td>
+	<td class="code">0x0007D000</td><td class="code">0x0007DFFF</td>
+	<td class="code">4096</td></tr>
+</table>
+<p>Pode-se escrever a seguinte fun&ccedil;&atilde;o para obter o endere&ccedil;o na mem&oacute;ria Flash
+a partir do n&uacute;mero do sertor:
+<pre class="code">
+<span style="color: #800000;">unsigned</span><span style="color: #000000;"> sect2addr(</span><span style="color: #800000;">int</span><span style="color: #000000;"> sector)</span>
+<span style="color: #000000;">{</span>
+<span style="color: #800000;">unsigned</span><span style="color: #000000;"> addr;</span>
+<span style="color: #000000;">addr=(sector &lt;&lt; </span><span style="color: #0000ff;">12</span><span style="color: #000000;">);</span>
+<span style="font-weight: bold;color: #000000;">if</span><span style="color: #000000;">(sector &gt; </span><span style="color: #0000ff;">8</span><span style="color: #000000;">) addr=(sector &lt;&lt; </span><span style="color: #0000ff;">15</span><span style="color: #000000;">)-</span><span style="color: #008080;">0x38000</span><span style="color: #000000;">;</span>
+<span style="font-weight: bold;color: #000000;">if</span><span style="color: #000000;">(sector &gt; </span><span style="color: #008080;">0x16</span><span style="color: #000000;">) addr=(sector &lt;&lt; </span><span style="color: #0000ff;">12</span><span style="color: #000000;">)+</span><span style="color: #008080;">0x62000</span><span style="color: #000000;">;</span>
+<span style="font-weight: bold;color: #000000;">return</span><span style="color: #000000;"> addr;</span>
+<span style="color: #000000;">}</span>
+</pre>
+<p>
+Os par&acirc;metros da fun&ccedil;&atilde;o <tt class="code">IAP_ENTRY</tt> s&atilde;o 
+especificados inicializando-se os valores do array <tt class="code">regs[]</tt>.
+O primeiro (<tt class="code">regs[0]</tt>) seleciona qual ser&aacute; a opera&ccedil;&atilde;o;
+os outros fornecem informa&ccedil;&otilde;es adicionais.
+<p>A tabela a seguir apresenta os comandos da ROM IAP:
+<dl>
+<dt><b>50 Preparar setores para escrita</b></dt>
+<dd>Este comando deve ser executado antes de apagar ou escrever setores.
+<table border=0>
+<tr><td>
+<b>Entrada:</b>
+<pre class="code">
+reg[0]=50;
+reg[1]=Setor_Inicial;
+reg[2]=Setor_Final;
+</pre>
+</td><td>
+<b>Sa&iacute;da</b>
+<pre class="code">
+reg[0]=STATUS;
+</pre>
+</tr></table>
+</dd>
+<dt><b>51 Copiar da RAM para a Flash</b></dt>
+<dd>Este comando grava um conjunto de bytes da RAM (Endereço 0x40000000 a 0x40007FFF) para
+a flash (a partir do endere&ccedil;o 0x00000000). 
+O n&uacute;mero de bytes deve ser 256, 512, 1024 ou 4096. Outros valores de n&uacute;mero de bytes 
+n&atilde;o s&atilde;o aceitos.
+O endere&ccedil;o de destino na Flash deve ser m&uacute;ltiplo de 256;
+<table border=0>
+<tr><td>
+<b>Entrada:</b>
+<pre class="code">
+reg[0]=51;
+reg[1]=Endere&ccedil;o destino na Flash.
+reg[2]=Numero de bytes (256 | 512 | 1024 | 4096)
+reg[3]=Frequ&ecirc;ncia de clock (CCLK) em Hz
+</pre></td><td>
+<b>Sa&iacute;da:</b>
+<pre class="code">
+reg[0]=STATUS;
+</pre>
+</td></tr></table></dd>
+<dt><b>52 Apagar setores</b></dt>
+<dd>A mem&oacute;ria Flash deve estar apagada (com todos os bytes com valor 0xFF)
+para que possa ser gravada. Este comando apaga um conjunto de setores.
+<table border=0>
+<tr><td>
+<b>Entrada:</b>
+<pre class="code">
+reg[0]=52;
+reg[1]=N&uacute;mero do setor inicial
+reg[2]=N&uacute;mero do setor final
+reg[3]=Frequ&ecirc;ncia de clock (CCLK) em Hz
+</pre></td><td>
+<b>Sa&iacute;da:</b>
+<pre class="code">
+reg[0]=STATUS;
+</pre>
+</td></tr></table></dd>
+<dt><b>53 Verificar se setores est&atilde;o apagados</b></dt>
+<dd>
+<table border=0>
+<tr><td>
+<b>Entrada:</b>
+<pre class="code">
+reg[0]=53;
+reg[1]=N&uacute;mero do setor inicial
+reg[2]=N&uacute;mero do setor final
+</pre></td><td>
+<b>Sa&iacute;da:</b>
+<pre class="code">
+reg[0]=STATUS;
+reg[1]=Endere&ccedil;o da primeira palavra n&atilde;o apagada.
+reg[1]=Valor da primeira palavra n&atilde;o apagada.
+</pre>
+</td></tr></table></dd>
+<dt><b>54 Le n&uacute;mero de identifica&ccedil;&atilde;o do microcontrolador</b></dt>
+<dd>Para o LPC2378 este n&uacute;mero &eacute; 117702437 decimal.
+<table border=0>
+<tr><td>
+<b>Entrada:</b>
+<pre class="code">
+reg[0]=54;
+</pre></td><td>
+<b>Sa&iacute;da:</b>
+<pre class="code">
+reg[0]=STATUS;
+reg[1]=n&uacute;mero de identifica&ccedil;&atilde;o
+</pre>
+</td></tr></table></dd>
+<dt><b>55 Le n&uacute;mero de vers&atilde;o do Boot Loader</b></dt>
+<dd>
+<table border=0>
+<tr><td>
+<b>Entrada:</b>
+<pre class="code">
+reg[0]=55;
+</pre></td><td>
+<b>Sa&iacute;da:</b>
+<pre class="code">
+reg[0]=STATUS;
+reg[1]=n&uacute;mero de vers&atilde;o (major)
+reg[2]=n&uacute;mero de vers&atilde;o (minor)
+</pre>
+</td></tr></table></dd>
+<dt><b>57 Entra em modo ISP</b></dt>
+<dd>Este comando invoca o Boot Loador no modo ISP (In System Programming)
+de modo que se possa usar um programador externo (como o lpc21isp).
+<table border=0>
+<tr><td>
+<b>Entrada:</b>
+<pre class="code">
+reg[0]=57;
+</pre></td><td>
+<b>Sa&iacute;da:</b>
+<pre class="code">
+N&atilde;o retorna.
+</pre>
+</td></tr></table></dd>
+
+
+</dl>
+<hr>
+<table width="100%" border=1>
+<tr><td class="nav" width="33%"><a href="lpc-08.html">Anterior</a></td>
+    <td class="nav" width="33%"><a href="lpc-index.html">Indice</a></td>
+    <td class="nav" width="33%"><a href="lpc-10.html">Pr&oacute;ximo</a></td></tr>
+</table>
+</body>
+</html>
