@@ -1,0 +1,37 @@
+###############################################################################
+#                                                                             #
+#       PUC - Pontificia Universidade Catolica do Rio Grande do Sul           #
+#                                                                             #
+#                        LABORATORIO DE PROCESSADORES	                      #
+#                                                                             #
+# Vinicius Grubel Kleinubing						      #
+# 09/2009								      #
+#									      #
+###############################################################################
+#				  OBJETIVOS				      #
+#									      #
+# Create a library to communicate LPC KIT whit GPS Garmin ETREX 	      #
+#									      #
+#									      #
+###############################################################################
+#									      #
+#				COLABORADORES				      #
+#									      #
+#									      #
+#									      #
+#									      #
+#									      #
+#									      #
+#									      #
+###############################################################################
+#									      #
+#				CODE STANDARD				      #
+#									      #
+#	- Always new line in the end of file				      #
+#	- Tab configured in four spaces					      #
+#									      #
+#									      #
+#									      #
+#									      #
+###############################################################################
+

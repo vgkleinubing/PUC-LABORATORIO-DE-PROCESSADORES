@@ -8,7 +8,7 @@ void U0puts(char *s);
 char *U0gets(char *txt, int nmax);
 
 /* Prototipos da UART1 */
-void U1init(void);
+void U1init(int baudrate);
 char U1getchar(void);
 void U1putchar(int c);
 void U1puts(char *s);

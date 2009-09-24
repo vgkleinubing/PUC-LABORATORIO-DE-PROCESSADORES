@@ -49,15 +49,14 @@ return txt;
 
 ///Falta configurar
 
-
 /* Configuracao da Porta Serial 1 (Parecido com o 16550) */
-void U1init(void)
+void U1init(int baudrate)
 {
 PINSEL1 |= 0x50;	/* Seleciona pinos TxD0 e RxD0 */
 U1FCR   = 0x7;		/* Habilita as FIFOs e reset */
 U1LCR   = 0x83;		/* Habilita acesso ao divisor de baud-rate (DLAB) */
-U1DLL   = ((CRYSTALFREQ/BAUDRATE + 8) >> 4) & 0xff;
-U1DLM   = ((CRYSTALFREQ/BAUDRATE) >>12) & 0xff;
+U1DLL   = ((CRYSTALFREQ/baudrate + 8) >> 4) & 0xff;
+U1DLM   = ((CRYSTALFREQ/baudrate) >>12) & 0xff;
 U1LCR    = 3;		/* Desabilita DLAB */
 }
 
@@ -95,3 +94,4 @@ do	{
 txt[k-1]='\0';
 return txt;
 }
+
