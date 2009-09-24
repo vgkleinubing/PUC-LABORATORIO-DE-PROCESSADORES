@@ -4,7 +4,7 @@
 #*************************************************/
 
 #Configuracoes especificas deste projeto
-SERIALDEV = com1
+SERIALDEV = /dev/ttyS0
 CLOCKFREQ = 12000
 TARGET = relogio
 MODULOS = main.o lcd.o crt.o

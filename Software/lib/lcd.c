@@ -3,7 +3,6 @@ Modulo para configurar o display LCD
 Tutorial LPC2378-gcc parte 4
 *************************************/
 #include <arch/nxp/lpc23xx.h>
-#include "lcd.h"
 
 /* Espera t milisegundos */
 void espera(int t)

@@ -4,20 +4,20 @@
 #*************************************************/
 
 #Configuracoes especificas deste projeto
-SERIALDEV = /dev/ttyUSB0
+SERIALDEV = /dev/ttyS0
 CLOCKFREQ = 12000
-TARGET = relogio
-MODULOS = main.o lcd.o crt.o
+TARGET = arm02
+MODULOS =  main.o crt.o
 TERMINAL = ltser
 BAUDRATE=19200
 
-#Nome do compilador C e linker
+#Nome do compilador C, assembler e linker
 CC      = arm-elf-gcc
 LD      = arm-elf-gcc
 AS	= arm-elf-as
+AFLAGS  = -mapcs-32 -mcpu=arm7tdmi
 CFLAGS  = -Wall -O2 -mcpu=arm7tdmi-s -D BAUDRATE=$(BAUDRATE)
 LFLAGS  = -nostartfiles
-AFLAGS  = -mcpu=arm7tdmi-s
 
 all: $(TARGET).hex
 
@@ -29,7 +29,7 @@ all: $(TARGET).hex
 %.o: %.c $(HEADERS)
 	$(CC) -c $(CFLAGS) -o $@ $<
 
-#Chama o assembler
+#Compila os modulos em assembly
 %.o: %.S
 	$(AS) $(AFLAGS) -o $@ $<
 
